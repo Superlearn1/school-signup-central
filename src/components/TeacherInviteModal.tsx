@@ -63,11 +63,10 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
       }
 
       // Send invitation via Clerk
-      // Using the correct method from Clerk API
+      // Using the correct parameters for inviteMember
       const invitation = await organization.inviteMember({
         emailAddress: email,
         role: 'org:teacher',
-        redirectUrl: window.location.origin + '/dashboard',
       });
 
       // Update used_teacher_seats in Supabase

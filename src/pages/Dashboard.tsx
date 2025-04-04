@@ -74,10 +74,10 @@ const Dashboard: React.FC = () => {
           if (organization) {
             try {
               const members = await organization.getMemberships();
-              // Count members with teacher role
+              // Count members with teacher role - using the correct property
               const teacherMembers = members.data.filter(
                 member => member.role === 'org:teacher' || 
-                          (member.status === 'invited' && member.publicMetadata.role === 'teacher')
+                          (member.publicMetadata.role === 'teacher')
               );
               setTeacherCount(teacherMembers.length);
             } catch (err) {
@@ -105,7 +105,7 @@ const Dashboard: React.FC = () => {
       organization.getMemberships().then(result => {
         const teacherMembers = result.data.filter(
           member => member.role === 'org:teacher' || 
-                   (member.status === 'invited' && member.publicMetadata.role === 'teacher')
+                   (member.publicMetadata.role === 'teacher')
         );
         setTeacherCount(teacherMembers.length);
       }).catch(err => {
