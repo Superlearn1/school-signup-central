@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSignUp } from '@clerk/clerk-react';
+import { useSignUp, useClerk } from '@clerk/clerk-react';
 import { School, SignupFormData } from '@/types';
 import { 
   fetchSchools, 
@@ -23,6 +24,7 @@ import StepIndicator from '@/components/StepIndicator';
 
 const AdminSignup: React.FC = () => {
   const { isLoaded, signUp, setActive } = useSignUp();
+  const { client: clerkClient } = useClerk();
   const [schools, setSchools] = useState<School[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [verifying, setVerifying] = useState<boolean>(false);
@@ -225,7 +227,7 @@ const AdminSignup: React.FC = () => {
           await claimSchool(formData.schoolId!, result.createdUserId);
           
           console.log("Creating Clerk organization for school:", selectedSchool.name);
-          const clerkOrganization = await window.Clerk.client.createOrganization({
+          const clerkOrganization = await clerkClient.createOrganization({
             name: selectedSchool.name,
           });
           
