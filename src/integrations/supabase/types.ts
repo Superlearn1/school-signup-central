@@ -9,147 +9,352 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      briefs: {
+      nccd_evidence: {
         Row: {
           created_at: string
-          custom_cta: string | null
-          icon: string | null
           id: string
-          music_style: string | null
-          notes: string | null
-          reference_content: Json | null
-          status: string
-          title: string
-          updated_at: string
-          user_id: string
+          pdf_url: string
+          resource_adaptation_id: string
+          school_id: string
+          student_id: string
+          taught_on: string
+          teacher_id: string
         }
         Insert: {
           created_at?: string
-          custom_cta?: string | null
-          icon?: string | null
           id?: string
-          music_style?: string | null
-          notes?: string | null
-          reference_content?: Json | null
-          status: string
-          title: string
-          updated_at?: string
-          user_id: string
+          pdf_url: string
+          resource_adaptation_id: string
+          school_id: string
+          student_id: string
+          taught_on: string
+          teacher_id: string
         }
         Update: {
           created_at?: string
-          custom_cta?: string | null
-          icon?: string | null
           id?: string
-          music_style?: string | null
-          notes?: string | null
-          reference_content?: Json | null
-          status?: string
-          title?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      content_references: {
-        Row: {
-          brief_id: string | null
-          comment: string | null
-          created_at: string
-          id: string
-          title: string
-          type: string
-          url: string | null
-        }
-        Insert: {
-          brief_id?: string | null
-          comment?: string | null
-          created_at?: string
-          id?: string
-          title: string
-          type: string
-          url?: string | null
-        }
-        Update: {
-          brief_id?: string | null
-          comment?: string | null
-          created_at?: string
-          id?: string
-          title?: string
-          type?: string
-          url?: string | null
+          pdf_url?: string
+          resource_adaptation_id?: string
+          school_id?: string
+          student_id?: string
+          taught_on?: string
+          teacher_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "content_references_brief_id_fkey"
-            columns: ["brief_id"]
-            isOneToOne: false
-            referencedRelation: "briefs"
+            foreignKeyName: "dccd_evidence_resource_adaptation_id_fkey"
+            columns: ["resource_adaptation_id"]
+            isOneToOne: true
+            referencedRelation: "resource_adaptations"
             referencedColumns: ["id"]
           },
-        ]
-      }
-      music_references: {
-        Row: {
-          brief_id: string | null
-          created_at: string
-          id: string
-          style: string | null
-          title: string
-          type: string
-          url: string | null
-        }
-        Insert: {
-          brief_id?: string | null
-          created_at?: string
-          id?: string
-          style?: string | null
-          title: string
-          type: string
-          url?: string | null
-        }
-        Update: {
-          brief_id?: string | null
-          created_at?: string
-          id?: string
-          style?: string | null
-          title?: string
-          type?: string
-          url?: string | null
-        }
-        Relationships: [
           {
-            foreignKeyName: "music_references_brief_id_fkey"
-            columns: ["brief_id"]
+            foreignKeyName: "dccd_evidence_school_id_fkey"
+            columns: ["school_id"]
             isOneToOne: false
-            referencedRelation: "briefs"
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dccd_evidence_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dccd_evidence_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
       }
       profiles: {
         Row: {
-          avatar_url: string | null
           created_at: string
           full_name: string | null
           id: string
-          updated_at: string
+          role: string
+          school_id: string
         }
         Insert: {
-          avatar_url?: string | null
           created_at?: string
           full_name?: string | null
           id: string
-          updated_at?: string
+          role: string
+          school_id: string
         }
         Update: {
-          avatar_url?: string | null
           created_at?: string
           full_name?: string | null
           id?: string
+          role?: string
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resource_adaptations: {
+        Row: {
+          adapted_content: string
+          created_at: string
+          created_by: string
+          disabilities_considered: Json | null
+          generated_by_ai: boolean | null
+          id: string
+          resource_id: string | null
+          school_id: string
+          student_id: string
+        }
+        Insert: {
+          adapted_content: string
+          created_at?: string
+          created_by: string
+          disabilities_considered?: Json | null
+          generated_by_ai?: boolean | null
+          id?: string
+          resource_id?: string | null
+          school_id: string
+          student_id: string
+        }
+        Update: {
+          adapted_content?: string
+          created_at?: string
+          created_by?: string
+          disabilities_considered?: Json | null
+          generated_by_ai?: boolean | null
+          id?: string
+          resource_id?: string | null
+          school_id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_adaptations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resource_adaptations_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resource_adaptations_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resource_adaptations_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resources: {
+        Row: {
+          content: string | null
+          created_at: string
+          created_by: string
+          id: string
+          objective: string | null
+          school_id: string
+          subject: string | null
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          objective?: string | null
+          school_id: string
+          subject?: string | null
+          title: string
+          type: string
           updated_at?: string
         }
+        Update: {
+          content?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          objective?: string | null
+          school_id?: string
+          subject?: string | null
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resources_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resources_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      schools: {
+        Row: {
+          acara_id: string | null
+          claimed_by_user_id: string | null
+          clerk_org_id: string | null
+          created_at: string
+          id: string
+          name: string
+          postcode: string | null
+          state: string | null
+          suburb: string | null
+        }
+        Insert: {
+          acara_id?: string | null
+          claimed_by_user_id?: string | null
+          clerk_org_id?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          postcode?: string | null
+          state?: string | null
+          suburb?: string | null
+        }
+        Update: {
+          acara_id?: string | null
+          claimed_by_user_id?: string | null
+          clerk_org_id?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          postcode?: string | null
+          state?: string | null
+          suburb?: string | null
+        }
         Relationships: []
+      }
+      students: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          disabilities: Json | null
+          full_name: string
+          id: string
+          school_id: string
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          disabilities?: Json | null
+          full_name: string
+          id?: string
+          school_id: string
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          disabilities?: Json | null
+          full_name?: string
+          id?: string
+          school_id?: string
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          created_at: string
+          id: string
+          school_id: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          total_student_seats: number
+          total_teacher_seats: number
+          updated_at: string
+          used_student_seats: number
+          used_teacher_seats: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          school_id: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          total_student_seats?: number
+          total_teacher_seats?: number
+          updated_at?: string
+          used_student_seats?: number
+          used_teacher_seats?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          school_id?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          total_student_seats?: number
+          total_teacher_seats?: number
+          updated_at?: string
+          used_student_seats?: number
+          used_teacher_seats?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
