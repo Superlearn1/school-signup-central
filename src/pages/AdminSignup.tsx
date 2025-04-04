@@ -9,7 +9,8 @@ import {
   claimSchool, 
   createOrganization,
   createProfile,
-  initializeSubscription
+  initializeSubscription,
+  updateSchoolWithClerkOrgId
 } from '@/services/api';
 
 import { Button } from '@/components/ui/button';
@@ -218,15 +219,18 @@ const AdminSignup: React.FC = () => {
         throw new Error('Email verification failed');
       }
 
+      // Set the active session for the newly created user
       await setActive({ session: result.createdSessionId });
 
       const selectedSchool = schools.find(school => school.id === formData.schoolId);
       
       if (selectedSchool && result.createdUserId) {
         try {
+          // First, claim the school
           await claimSchool(formData.schoolId!, result.createdUserId);
           
           console.log("Creating Clerk organization for school:", selectedSchool.name);
+          // Create the Clerk organization
           const clerkOrganization = await clerk.createOrganization({
             name: selectedSchool.name,
           });
@@ -237,6 +241,16 @@ const AdminSignup: React.FC = () => {
           
           console.log("Clerk organization created with ID:", clerkOrganization.id);
           
+          // Add the user to the organization with admin role
+          await clerkOrganization.addMember({
+            userId: result.createdUserId,
+            role: "admin"
+          });
+          
+          // Set this organization as active for the current user
+          await clerk.setActive({ organization: clerkOrganization.id });
+          
+          // Create organization record in database
           const organization = await createOrganization(
             formData.schoolId!, 
             result.createdUserId, 
@@ -244,6 +258,10 @@ const AdminSignup: React.FC = () => {
             clerkOrganization.id
           );
           
+          // Update the school record with the clerk_org_id
+          await updateSchoolWithClerkOrgId(formData.schoolId!, clerkOrganization.id);
+          
+          // Create the admin profile
           await createProfile(
             result.createdUserId,
             formData.schoolId!,
@@ -251,6 +269,7 @@ const AdminSignup: React.FC = () => {
             formData.username
           );
           
+          // Initialize subscription
           await initializeSubscription(formData.schoolId!);
           
           toast({

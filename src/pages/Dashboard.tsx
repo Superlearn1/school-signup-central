@@ -13,7 +13,7 @@ import TeacherInviteModal from '@/components/TeacherInviteModal';
 const Dashboard: React.FC = () => {
   const { user } = useUser();
   const { signOut } = useClerk();
-  const { organization } = useOrganization();
+  const { organization, isLoaded: isOrgLoaded } = useOrganization();
   const { toast } = useToast();
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [schoolId, setSchoolId] = useState<string | null>(null);
@@ -23,7 +23,7 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!user?.id) return;
+      if (!user?.id || !isOrgLoaded) return;
 
       try {
         setLoading(true);
@@ -31,6 +31,7 @@ const Dashboard: React.FC = () => {
 
         // First try to get from organization
         if (organization?.id) {
+          console.log("Organization found:", organization.id, organization.name);
           // Use raw query to avoid type issues
           const { data: orgData } = await supabase
             .from('organizations')
@@ -40,11 +41,13 @@ const Dashboard: React.FC = () => {
 
           if (orgData?.school_id) {
             fetchedSchoolId = orgData.school_id;
+            console.log("School ID found from organization:", fetchedSchoolId);
           }
         }
 
         // Fallback to getting from claimed schools
         if (!fetchedSchoolId) {
+          console.log("No organization or school ID found, trying claimed schools");
           const { data: schoolData } = await supabase
             .from('schools')
             .select('id')
@@ -53,6 +56,7 @@ const Dashboard: React.FC = () => {
 
           if (schoolData?.id) {
             fetchedSchoolId = schoolData.id;
+            console.log("School ID found from claimed schools:", fetchedSchoolId);
           }
         }
 
@@ -74,16 +78,24 @@ const Dashboard: React.FC = () => {
           if (organization) {
             try {
               const members = await organization.getMemberships();
-              // Count members with teacher role - using the correct property
+              console.log("Organization members:", members.data.length);
+              
+              // Count members with teacher role
               const teacherMembers = members.data.filter(
                 member => member.role === 'org:teacher' || 
-                          (member.publicMetadata.role === 'teacher')
+                          (member.publicMetadata && member.publicMetadata.role === 'teacher')
               );
+              
+              console.log("Teacher members found:", teacherMembers.length);
               setTeacherCount(teacherMembers.length);
             } catch (err) {
               console.error("Error fetching organization members:", err);
             }
+          } else {
+            console.warn("No organization found for user");
           }
+        } else {
+          console.error("No school ID found for user");
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -93,9 +105,17 @@ const Dashboard: React.FC = () => {
     };
 
     fetchData();
-  }, [user, organization]);
+  }, [user, organization, isOrgLoaded]);
 
   const handleInviteTeacher = () => {
+    if (!organization) {
+      toast({
+        variant: 'destructive',
+        title: 'Organization not found',
+        description: 'Cannot invite teachers without an active organization',
+      });
+      return;
+    }
     setShowInviteModal(true);
   };
 
@@ -105,7 +125,7 @@ const Dashboard: React.FC = () => {
       organization.getMemberships().then(result => {
         const teacherMembers = result.data.filter(
           member => member.role === 'org:teacher' || 
-                   (member.publicMetadata.role === 'teacher')
+                   (member.publicMetadata && member.publicMetadata.role === 'teacher')
         );
         setTeacherCount(teacherMembers.length);
       }).catch(err => {

@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { School, Organization, Profile, Subscription, Student, Resource, ResourceAdaptation, NCCDEvidence } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,6 +40,18 @@ export const claimSchool = async (schoolId: string, clerkUserId: string): Promis
 
   if (error) {
     console.error('Error claiming school:', error);
+    throw error;
+  }
+};
+
+export const updateSchoolWithClerkOrgId = async (schoolId: string, clerkOrgId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('schools')
+    .update({ clerk_org_id: clerkOrgId })
+    .eq('id', schoolId);
+
+  if (error) {
+    console.error('Error updating school with Clerk organization ID:', error);
     throw error;
   }
 };
