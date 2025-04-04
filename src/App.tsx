@@ -46,7 +46,7 @@ const ClerkKeyMissing = () => {
 
 // Temporarily hardcoded key for development purposes
 // In production, this should be properly secured
-const TEMP_CLERK_KEY = "pk_test_YWN0aXZlLWJvYmNhdC01MS5jbGVyay5hY2NvdW50cy5kZXYk";
+const TEMP_CLERK_KEY = "pk_test_cGxlYXNpbmctZG9iZXJtYW4tNDAuY2xlcmsuYWNjb3VudHMuZGV2JA";
 
 const App = () => {
   const [clerkPubKey, setClerkPubKey] = useState<string | null>(null);
@@ -56,12 +56,14 @@ const App = () => {
     const envKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
     
     if (envKey) {
+      console.log("Using Clerk key from environment variables");
       setClerkPubKey(envKey);
       return;
     }
     
     // For development purposes only - in production, implement proper key management
     // This is a temporary solution to get the app working for demonstration
+    console.log("Using fallback Clerk key for development");
     setClerkPubKey(TEMP_CLERK_KEY);
     
     // Log warning about using temporary key
