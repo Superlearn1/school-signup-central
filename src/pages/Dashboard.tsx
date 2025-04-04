@@ -3,7 +3,7 @@ import React from 'react';
 import { useUser, useClerk, useOrganization } from '@clerk/clerk-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { School, Users, UserPlus, Settings, LogOut } from 'lucide-react';
+import { School, Users, UserPlus, Settings, LogOut, CreditCard, Check } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 const Dashboard: React.FC = () => {
