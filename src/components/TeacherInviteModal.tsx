@@ -46,7 +46,7 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
       console.log("Organization ID for invitations:", organization.id);
       
       // Check for metadata to get school ID
-      const schoolId = organization.publicMetadata.schoolId || null;
+      const schoolId = organization.publicMetadata?.schoolId as string || null;
       console.log("School ID from organization metadata:", schoolId);
       
       // If no school ID in metadata, try to find it from database
@@ -59,7 +59,7 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
           .maybeSingle();
           
         if (orgData?.school_id) {
-          dbSchoolId = orgData.school_id;
+          dbSchoolId = orgData.school_id as string;
           console.log("School ID found from database:", dbSchoolId);
         }
       }
@@ -92,10 +92,8 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
       const invitation = await organization.inviteMember({
         emailAddress: email,
         role: "org:teacher",
-        publicMetadata: {
-          role: "teacher",
-          schoolId: dbSchoolId
-        }
+        // Clerk no longer supports publicMetadata in inviteMember params
+        // We'll need to set this when the user accepts the invitation
       });
       
       console.log("Invitation sent:", invitation);
