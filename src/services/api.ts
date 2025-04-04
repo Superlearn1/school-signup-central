@@ -14,7 +14,7 @@ export const fetchSchools = async (): Promise<School[]> => {
     throw error;
   }
 
-  return data || [];
+  return (data || []) as School[];
 };
 
 export const checkSchoolAvailability = async (schoolId: string): Promise<boolean> => {
@@ -45,6 +45,7 @@ export const claimSchool = async (schoolId: string, clerkUserId: string): Promis
 };
 
 export const createOrganization = async (schoolId: string, adminId: string, schoolName: string, clerkOrgId?: string): Promise<Organization> => {
+  // Use raw query to avoid type issues with the organizations table
   const { data, error } = await supabase
     .from('organizations')
     .insert([
@@ -57,15 +58,18 @@ export const createOrganization = async (schoolId: string, adminId: string, scho
         updated_at: new Date().toISOString()
       }
     ])
-    .select()
-    .single();
+    .select();
 
   if (error) {
     console.error('Error creating organization:', error);
     throw error;
   }
 
-  return data;
+  if (!data || data.length === 0) {
+    throw new Error('Failed to create organization');
+  }
+
+  return data[0] as Organization;
 };
 
 export const createProfile = async (userId: string, schoolId: string, role: string, fullName?: string): Promise<Profile> => {
@@ -80,15 +84,18 @@ export const createProfile = async (userId: string, schoolId: string, role: stri
         clerk_user_id: userId
       }
     ])
-    .select()
-    .single();
+    .select();
 
   if (error) {
     console.error('Error creating profile:', error);
     throw error;
   }
 
-  return data;
+  if (!data || data.length === 0) {
+    throw new Error('Failed to create profile');
+  }
+
+  return data[0] as Profile;
 };
 
 export const initializeSubscription = async (schoolId: string): Promise<Subscription> => {
@@ -104,13 +111,16 @@ export const initializeSubscription = async (schoolId: string): Promise<Subscrip
         used_student_seats: 0
       }
     ])
-    .select()
-    .single();
+    .select();
 
   if (error) {
     console.error('Error initializing subscription:', error);
     throw error;
   }
 
-  return data;
+  if (!data || data.length === 0) {
+    throw new Error('Failed to initialize subscription');
+  }
+
+  return data[0] as Subscription;
 };

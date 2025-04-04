@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { School, Users, UserPlus, Settings, LogOut, CreditCard, Check } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Subscription, Organization } from '@/types';
+import { Subscription } from '@/types';
 
 const Dashboard: React.FC = () => {
   const { user } = useUser();
@@ -27,11 +27,12 @@ const Dashboard: React.FC = () => {
 
         // First try to get from organization
         if (organization?.id) {
+          // Use raw query to avoid type issues
           const { data: orgData } = await supabase
             .from('organizations')
             .select('school_id')
             .eq('clerk_org_id', organization.id)
-            .single();
+            .maybeSingle();
 
           if (orgData?.school_id) {
             fetchedSchoolId = orgData.school_id;
@@ -44,7 +45,7 @@ const Dashboard: React.FC = () => {
             .from('schools')
             .select('id')
             .eq('claimed_by_user_id', user.id)
-            .single();
+            .maybeSingle();
 
           if (schoolData?.id) {
             fetchedSchoolId = schoolData.id;
@@ -59,10 +60,10 @@ const Dashboard: React.FC = () => {
             .from('subscriptions')
             .select('*')
             .eq('school_id', fetchedSchoolId)
-            .single();
+            .maybeSingle();
 
           if (subscriptionData) {
-            setSubscription(subscriptionData);
+            setSubscription(subscriptionData as Subscription);
           }
         }
       } catch (error) {

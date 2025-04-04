@@ -5,6 +5,13 @@ export interface School {
   address?: string;
   claimed: boolean;
   user_id?: string | null;
+  claimed_by_user_id?: string | null;
+  clerk_org_id?: string | null;
+  acara_id?: string | null;
+  postcode?: string | null;
+  state?: string | null;
+  suburb?: string | null;
+  created_at?: string;
 }
 
 export interface SignupFormData {

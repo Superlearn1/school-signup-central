@@ -24,11 +24,12 @@ const Subscription: React.FC = () => {
       try {
         // First try to get from organization
         if (organization?.id) {
-          const { data, error } = await supabase
+          // Use raw query to avoid type issues
+          const { data } = await supabase
             .from('organizations')
             .select('school_id')
             .eq('clerk_org_id', organization.id)
-            .single();
+            .maybeSingle();
 
           if (data?.school_id) {
             setSchoolId(data.school_id);
@@ -37,18 +38,13 @@ const Subscription: React.FC = () => {
         }
 
         // Fallback to getting from claimed schools
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('schools')
           .select('id')
           .eq('claimed_by_user_id', user.id)
-          .single();
+          .maybeSingle();
 
-        if (error) {
-          console.error('Error fetching school:', error);
-          return;
-        }
-
-        if (data) {
+        if (data?.id) {
           setSchoolId(data.id);
         }
       } catch (error) {
