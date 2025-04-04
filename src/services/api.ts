@@ -1,6 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { School, Organization, Profile, Subscription } from '@/types';
+import { School, Organization, Profile, Subscription, Student, Resource, ResourceAdaptation, NCCDEvidence } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 
 export const fetchSchools = async (): Promise<School[]> => {
@@ -123,4 +123,114 @@ export const initializeSubscription = async (schoolId: string): Promise<Subscrip
   }
 
   return data[0] as Subscription;
+};
+
+// Student management API functions
+export const fetchStudents = async (schoolId: string): Promise<Student[]> => {
+  const { data, error } = await supabase
+    .from('students')
+    .select('*')
+    .eq('school_id', schoolId)
+    .order('last_name');
+
+  if (error) {
+    console.error('Error fetching students:', error);
+    throw error;
+  }
+
+  return (data || []) as Student[];
+};
+
+export const createStudent = async (student: Omit<Student, 'id' | 'created_at'>): Promise<Student> => {
+  const { data, error } = await supabase
+    .from('students')
+    .insert([{
+      ...student,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }])
+    .select();
+
+  if (error) {
+    console.error('Error creating student:', error);
+    throw error;
+  }
+
+  if (!data || data.length === 0) {
+    throw new Error('Failed to create student');
+  }
+
+  return data[0] as Student;
+};
+
+export const updateStudent = async (studentId: string, updates: Partial<Omit<Student, 'id' | 'created_at'>>): Promise<Student> => {
+  const { data, error } = await supabase
+    .from('students')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', studentId)
+    .select();
+
+  if (error) {
+    console.error('Error updating student:', error);
+    throw error;
+  }
+
+  if (!data || data.length === 0) {
+    throw new Error('Failed to update student');
+  }
+
+  return data[0] as Student;
+};
+
+export const deleteStudent = async (studentId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('students')
+    .delete()
+    .eq('id', studentId);
+
+  if (error) {
+    console.error('Error deleting student:', error);
+    throw error;
+  }
+};
+
+// Resource management API functions
+export const fetchResources = async (schoolId: string): Promise<Resource[]> => {
+  const { data, error } = await supabase
+    .from('resources')
+    .select('*')
+    .eq('school_id', schoolId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching resources:', error);
+    throw error;
+  }
+
+  return (data || []) as Resource[];
+};
+
+export const createResource = async (resource: Omit<Resource, 'id' | 'created_at'>): Promise<Resource> => {
+  const { data, error } = await supabase
+    .from('resources')
+    .insert([{
+      ...resource,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }])
+    .select();
+
+  if (error) {
+    console.error('Error creating resource:', error);
+    throw error;
+  }
+
+  if (!data || data.length === 0) {
+    throw new Error('Failed to create resource');
+  }
+
+  return data[0] as Resource;
 };

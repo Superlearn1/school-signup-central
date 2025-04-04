@@ -11,6 +11,7 @@ import NotFound from "./pages/NotFound";
 import AdminSignup from "./pages/AdminSignup";
 import Subscription from "./pages/Subscription";
 import Dashboard from "./pages/Dashboard";
+import StudentManagement from "./pages/StudentManagement";
 import { useToast } from "@/hooks/use-toast";
 
 const queryClient = new QueryClient();
@@ -91,6 +92,14 @@ const App = () => {
                 element={
                   <ProtectedRoute>
                     <Dashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/students" 
+                element={
+                  <ProtectedRoute>
+                    <StudentManagement />
                   </ProtectedRoute>
                 } 
               />

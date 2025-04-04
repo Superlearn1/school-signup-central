@@ -58,3 +58,42 @@ export interface Subscription {
   created_at: string;
   updated_at: string;
 }
+
+export interface Student {
+  id: string;
+  school_id: string;
+  student_id: string;
+  first_name: string;
+  last_name: string;
+  disabilities: string[];
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface Resource {
+  id: string;
+  school_id: string;
+  teacher_id: string;
+  title: string;
+  content: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface ResourceAdaptation {
+  id: string;
+  resource_id: string;
+  student_id: string;
+  adapted_content: string;
+  adaptations_made: string;
+  created_at: string;
+}
+
+export interface NCCDEvidence {
+  id: string;
+  adaptation_id: string;
+  teacher_id: string;
+  date_taught: string;
+  pdf_path: string;
+  created_at: string;
+}
