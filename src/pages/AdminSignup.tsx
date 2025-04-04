@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSignUp } from '@clerk/clerk-react';
@@ -69,7 +68,6 @@ const AdminSignup: React.FC = () => {
     loadSchools();
   }, [toast]);
 
-  // Filter schools based on search query
   useEffect(() => {
     if (searchQuery.trim() === '') {
       setFilteredSchools(schools);
@@ -87,7 +85,6 @@ const AdminSignup: React.FC = () => {
       ...formData,
       [name]: value,
     });
-    // Clear error when typing
     if (errors[name as keyof typeof errors]) {
       setErrors({
         ...errors,
@@ -118,7 +115,6 @@ const AdminSignup: React.FC = () => {
     let isValid = true;
 
     if (currentStep === 0) {
-      // Validate account information
       if (!formData.username.trim()) {
         newErrors.username = 'Username is required';
         isValid = false;
@@ -138,12 +134,10 @@ const AdminSignup: React.FC = () => {
         isValid = false;
       }
     } else if (currentStep === 1) {
-      // Validate school selection
       if (!formData.schoolId) {
         newErrors.schoolId = 'Please select a school';
         isValid = false;
       } else {
-        // Check if school is available
         try {
           const isAvailable = await checkSchoolAvailability(formData.schoolId);
           if (!isAvailable) {
@@ -161,7 +155,6 @@ const AdminSignup: React.FC = () => {
         }
       }
     } else if (currentStep === 2) {
-      // Validate verification code
       if (!code.trim()) {
         newErrors.code = 'Verification code is required';
         isValid = false;
@@ -183,15 +176,11 @@ const AdminSignup: React.FC = () => {
         return;
       }
 
-      // Modified: Remove username from the signUp.create call if not supported by Clerk
       await signUp.create({
         emailAddress: formData.email,
         password: formData.password,
-        // Only include username if needed for your Clerk instance
-        // username: formData.username,
       });
 
-      // Start email verification
       await signUp.prepareEmailAddressVerification({
         strategy: 'email_code',
       });
@@ -227,25 +216,32 @@ const AdminSignup: React.FC = () => {
         throw new Error('Email verification failed');
       }
 
-      // The user has been created and their email verified
-      // Now let's make them the active user
       await setActive({ session: result.createdSessionId });
 
       const selectedSchool = schools.find(school => school.id === formData.schoolId);
       
       if (selectedSchool && result.createdUserId) {
         try {
-          // Claim the school
           await claimSchool(formData.schoolId!, result.createdUserId);
           
-          // Create organization in Supabase
+          console.log("Creating Clerk organization for school:", selectedSchool.name);
+          const clerkOrganization = await window.Clerk.client.createOrganization({
+            name: selectedSchool.name,
+          });
+          
+          if (!clerkOrganization || !clerkOrganization.id) {
+            throw new Error('Failed to create Clerk organization');
+          }
+          
+          console.log("Clerk organization created with ID:", clerkOrganization.id);
+          
           const organization = await createOrganization(
             formData.schoolId!, 
             result.createdUserId, 
-            selectedSchool.name
+            selectedSchool.name,
+            clerkOrganization.id
           );
           
-          // Create admin profile
           await createProfile(
             result.createdUserId,
             formData.schoolId!,
@@ -253,7 +249,6 @@ const AdminSignup: React.FC = () => {
             formData.username
           );
           
-          // Initialize subscription
           await initializeSubscription(formData.schoolId!);
           
           toast({
@@ -270,7 +265,6 @@ const AdminSignup: React.FC = () => {
         }
       }
 
-      // Move to subscription step
       setCurrentStep(3);
     } catch (error: any) {
       console.error('Verification error:', error);
@@ -289,7 +283,6 @@ const AdminSignup: React.FC = () => {
   };
 
   const handleStartSubscription = () => {
-    // Redirect to subscription page
     navigate('/subscription');
   };
 
