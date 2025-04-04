@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { School, Organization, Profile, Subscription, Student, Resource, ResourceAdaptation, NCCDEvidence } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -45,7 +44,6 @@ export const claimSchool = async (schoolId: string, clerkUserId: string): Promis
 };
 
 export const createOrganization = async (schoolId: string, adminId: string, schoolName: string, clerkOrgId?: string): Promise<Organization> => {
-  // Use raw query to avoid type issues with the organizations table
   const { data, error } = await supabase
     .from('organizations')
     .insert([
@@ -125,7 +123,6 @@ export const initializeSubscription = async (schoolId: string): Promise<Subscrip
   return data[0] as Subscription;
 };
 
-// Student management API functions
 export const fetchStudents = async (schoolId: string): Promise<Student[]> => {
   const { data, error } = await supabase
     .from('students')
@@ -138,9 +135,7 @@ export const fetchStudents = async (schoolId: string): Promise<Student[]> => {
     throw error;
   }
 
-  // Transform the data to match our Student type format
   const students = (data || []).map(student => {
-    // For UI display, split full_name into first_name and last_name if needed
     let firstName = '';
     let lastName = '';
     
@@ -162,7 +157,6 @@ export const fetchStudents = async (schoolId: string): Promise<Student[]> => {
 };
 
 export const createStudent = async (student: Omit<Student, 'id' | 'created_at'>): Promise<Student> => {
-  // Transform from our UI format to database format
   const dbStudent = {
     school_id: student.school_id,
     student_id: student.student_id,
@@ -186,36 +180,42 @@ export const createStudent = async (student: Omit<Student, 'id' | 'created_at'>)
     throw new Error('Failed to create student');
   }
 
-  // Transform back to our Student type format
+  const dbResponse = data[0];
+  const nameParts = dbResponse.full_name ? dbResponse.full_name.split(' ') : ['', ''];
+  const firstName = nameParts[0] || '';
+  const lastName = nameParts.slice(1).join(' ') || '';
+
   const newStudent = {
-    ...data[0],
-    first_name: student.first_name,
-    last_name: student.last_name,
-    disabilities: data[0].disabilities || []
+    ...dbResponse,
+    first_name: firstName,
+    last_name: lastName,
+    disabilities: dbResponse.disabilities || []
   } as Student;
 
   return newStudent;
 };
 
 export const updateStudent = async (studentId: string, updates: Partial<Omit<Student, 'id' | 'created_at'>>): Promise<Student> => {
-  // Transform from our UI format to database format
   const dbUpdates: any = { ...updates };
   
-  // If both first_name and last_name are provided, update full_name
   if (updates.first_name !== undefined || updates.last_name !== undefined) {
-    // Get the current student to get the existing names if only one part is being updated
     const { data: currentStudent } = await supabase
       .from('students')
       .select('*')
       .eq('id', studentId)
       .single();
     
-    const firstName = updates.first_name !== undefined ? updates.first_name : currentStudent?.first_name || '';
-    const lastName = updates.last_name !== undefined ? updates.last_name : currentStudent?.last_name || '';
+    if (currentStudent) {
+      const nameParts = currentStudent.full_name ? currentStudent.full_name.split(' ') : ['', ''];
+      const currentFirstName = nameParts[0] || '';
+      const currentLastName = nameParts.slice(1).join(' ') || '';
+      
+      const firstName = updates.first_name !== undefined ? updates.first_name : currentFirstName;
+      const lastName = updates.last_name !== undefined ? updates.last_name : currentLastName;
+      
+      dbUpdates.full_name = `${firstName} ${lastName}`.trim();
+    }
     
-    dbUpdates.full_name = `${firstName} ${lastName}`.trim();
-    
-    // Remove first_name and last_name from dbUpdates as they're not in the database
     delete dbUpdates.first_name;
     delete dbUpdates.last_name;
   }
@@ -237,16 +237,16 @@ export const updateStudent = async (studentId: string, updates: Partial<Omit<Stu
     throw new Error('Failed to update student');
   }
 
-  // Transform back to our Student type format
-  const nameParts = data[0].full_name ? data[0].full_name.split(' ') : ['', ''];
+  const dbResponse = data[0];
+  const nameParts = dbResponse.full_name ? dbResponse.full_name.split(' ') : ['', ''];
   const firstName = nameParts[0] || '';
   const lastName = nameParts.slice(1).join(' ') || '';
 
   const updatedStudent = {
-    ...data[0],
+    ...dbResponse,
     first_name: firstName,
     last_name: lastName,
-    disabilities: data[0].disabilities || []
+    disabilities: dbResponse.disabilities || []
   } as Student;
 
   return updatedStudent;
@@ -264,7 +264,6 @@ export const deleteStudent = async (studentId: string): Promise<void> => {
   }
 };
 
-// Resource management API functions
 export const fetchResources = async (schoolId: string): Promise<Resource[]> => {
   const { data, error } = await supabase
     .from('resources')
@@ -277,7 +276,6 @@ export const fetchResources = async (schoolId: string): Promise<Resource[]> => {
     throw error;
   }
 
-  // Transform data to match our Resource type
   const resources = (data || []).map(resource => ({
     ...resource,
     content: resource.content || '',
@@ -287,7 +285,6 @@ export const fetchResources = async (schoolId: string): Promise<Resource[]> => {
 };
 
 export const createResource = async (resource: Omit<Resource, 'id' | 'created_at'>): Promise<Resource> => {
-  // Make sure we're using created_by instead of teacher_id
   const dbResource = {
     school_id: resource.school_id,
     created_by: resource.created_by,
