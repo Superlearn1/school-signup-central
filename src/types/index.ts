@@ -59,23 +59,32 @@ export interface Subscription {
   updated_at: string;
 }
 
+// Updated to match database schema
 export interface Student {
   id: string;
   school_id: string;
   student_id: string;
-  first_name: string;
-  last_name: string;
-  disabilities: string[];
+  full_name: string;  // Changed from first_name + last_name
+  disabilities: string[] | any; // Support for Json type from database
   created_at: string;
   updated_at?: string;
+  created_by?: string | null;
+  
+  // For UI purposes only, not in database
+  first_name?: string;
+  last_name?: string;
 }
 
+// Updated to match database schema
 export interface Resource {
   id: string;
   school_id: string;
-  teacher_id: string;
+  created_by: string; // Changed from teacher_id
   title: string;
-  content: string;
+  content: string | null;
+  type: string;
+  subject?: string | null;
+  objective?: string | null;
   created_at: string;
   updated_at?: string;
 }

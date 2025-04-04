@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,10 +28,29 @@ export const StudentForm: React.FC<StudentFormProps> = ({
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  useEffect(() => {
+    if (initialData) {
+      let firstName = initialData.first_name || '';
+      let lastName = initialData.last_name || '';
+
+      if (!firstName && !lastName && initialData.full_name) {
+        const nameParts = initialData.full_name.split(' ');
+        firstName = nameParts[0] || '';
+        lastName = nameParts.slice(1).join(' ') || '';
+      }
+
+      setFormData({
+        student_id: initialData.student_id || '',
+        first_name: firstName,
+        last_name: lastName,
+        disabilities: initialData.disabilities || [],
+      });
+    }
+  }, [initialData]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    // Clear error when field is edited
     if (errors[name]) {
       setErrors((prev) => {
         const newErrors = { ...prev };
@@ -73,7 +91,11 @@ export const StudentForm: React.FC<StudentFormProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validate()) {
-      onSubmit(formData);
+      const data = {
+        ...formData,
+        full_name: `${formData.first_name} ${formData.last_name}`.trim()
+      };
+      onSubmit(data);
     }
   };
 

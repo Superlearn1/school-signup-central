@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useUser, useOrganization } from '@clerk/clerk-react';
 import { Button } from '@/components/ui/button';
@@ -30,7 +29,6 @@ const StudentManagement: React.FC = () => {
       if (!user?.id) return;
 
       try {
-        // First try to get from organization
         if (organization?.id) {
           const { data: orgData } = await supabase
             .from('organizations')
@@ -44,7 +42,6 @@ const StudentManagement: React.FC = () => {
           }
         }
 
-        // Fallback to getting from claimed schools
         const { data: schoolData } = await supabase
           .from('schools')
           .select('id')
@@ -62,14 +59,24 @@ const StudentManagement: React.FC = () => {
     fetchSchoolId();
   }, [user, organization]);
 
-  // Query to fetch students
   const { data: students = [], isLoading } = useQuery({
     queryKey: ['students', schoolId],
     queryFn: () => schoolId ? fetchStudents(schoolId) : Promise.resolve([]),
     enabled: !!schoolId,
   });
 
-  // Mutation to create a student
+  const displayStudents = students.map(student => {
+    if (!student.first_name && !student.last_name && student.full_name) {
+      const nameParts = student.full_name.split(' ');
+      return {
+        ...student,
+        first_name: nameParts[0] || '',
+        last_name: nameParts.slice(1).join(' ') || ''
+      };
+    }
+    return student;
+  });
+
   const createStudentMutation = useMutation({
     mutationFn: createStudent,
     onSuccess: () => {
@@ -89,7 +96,6 @@ const StudentManagement: React.FC = () => {
     },
   });
 
-  // Mutation to update a student
   const updateStudentMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<Omit<Student, 'id' | 'created_at'>> }) => 
       updateStudent(id, data),
@@ -111,7 +117,6 @@ const StudentManagement: React.FC = () => {
     },
   });
 
-  // Mutation to delete a student
   const deleteStudentMutation = useMutation({
     mutationFn: deleteStudent,
     onSuccess: () => {
@@ -132,10 +137,15 @@ const StudentManagement: React.FC = () => {
 
   const handleAddStudent = (studentData: Omit<Student, 'id' | 'created_at' | 'updated_at'>) => {
     if (schoolId) {
-      createStudentMutation.mutate({
+      const newStudent = {
         ...studentData,
         school_id: schoolId,
-      });
+        first_name: studentData.first_name,
+        last_name: studentData.last_name,
+        full_name: studentData.full_name || `${studentData.first_name} ${studentData.last_name}`.trim(),
+      };
+      
+      createStudentMutation.mutate(newStudent);
     }
   };
 
@@ -143,7 +153,14 @@ const StudentManagement: React.FC = () => {
     if (editingStudent) {
       updateStudentMutation.mutate({
         id: editingStudent.id,
-        data: studentData,
+        data: {
+          ...studentData,
+          full_name: studentData.full_name || (
+            (studentData.first_name !== undefined || studentData.last_name !== undefined) ? 
+              `${studentData.first_name || editingStudent.first_name || ''} ${studentData.last_name || editingStudent.last_name || ''}`.trim() : 
+              undefined
+          ),
+        },
       });
     }
   };
@@ -164,10 +181,11 @@ const StudentManagement: React.FC = () => {
     setEditingStudent(null);
   };
 
-  const filteredStudents = students.filter(
+  const filteredStudents = displayStudents.filter(
     (student) =>
-      student.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (student.first_name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (student.last_name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (student.full_name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
       student.student_id.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
