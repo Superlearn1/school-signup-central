@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 const queryClient = new QueryClient();
 
 // Get Clerk publishable key from environment
-const clerkPubKey = 'pk_test_cGxlYXNpbmctZG9iZXJtYW4tNDAuY2xlcmsuYWNjb3VudHMuZGV2JA';
+const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 // Display a helpful error message if the key is missing
 if (!clerkPubKey) {
