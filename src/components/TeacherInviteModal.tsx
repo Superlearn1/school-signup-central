@@ -63,7 +63,8 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
       }
 
       // Send invitation via Clerk
-      const invitation = await organization.createMembershipInvitation({
+      // Using the correct method from Clerk API
+      const invitation = await organization.inviteMember({
         emailAddress: email,
         role: 'org:teacher',
         redirectUrl: window.location.origin + '/dashboard',
