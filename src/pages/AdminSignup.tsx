@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSignUp } from '@clerk/clerk-react';
@@ -16,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertCircle, School as SchoolIcon, LucideMailCheck, CreditCard, Users } from 'lucide-react';
+import { AlertCircle, School as SchoolIcon, LucideMailCheck, CreditCard, Users, Search } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/components/ui/use-toast';
 import StepIndicator from '@/components/StepIndicator';
@@ -31,6 +32,8 @@ const AdminSignup: React.FC = () => {
   const steps = ['Account', 'School', 'Verify', 'Subscribe'];
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [filteredSchools, setFilteredSchools] = useState<School[]>([]);
 
   const [formData, setFormData] = useState<SignupFormData>({
     username: '',
@@ -52,6 +55,7 @@ const AdminSignup: React.FC = () => {
       try {
         const schoolsList = await fetchSchools();
         setSchools(schoolsList);
+        setFilteredSchools(schoolsList);
       } catch (error) {
         console.error('Failed to load schools:', error);
         toast({
@@ -64,6 +68,18 @@ const AdminSignup: React.FC = () => {
 
     loadSchools();
   }, [toast]);
+
+  // Filter schools based on search query
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredSchools(schools);
+    } else {
+      const filtered = schools.filter(school => 
+        school.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredSchools(filtered);
+    }
+  }, [searchQuery, schools]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -91,6 +107,10 @@ const AdminSignup: React.FC = () => {
         schoolId: '',
       });
     }
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
   };
 
   const validateStep = async (): Promise<boolean> => {
@@ -163,10 +183,12 @@ const AdminSignup: React.FC = () => {
         return;
       }
 
+      // Modified: Remove username from the signUp.create call if not supported by Clerk
       await signUp.create({
-        username: formData.username,
         emailAddress: formData.email,
         password: formData.password,
+        // Only include username if needed for your Clerk instance
+        // username: formData.username,
       });
 
       // Start email verification
@@ -355,6 +377,19 @@ const AdminSignup: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
+                <Label htmlFor="schoolSearch">Search for a school</Label>
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="schoolSearch"
+                    placeholder="Search schools..."
+                    className="pl-8"
+                    value={searchQuery}
+                    onChange={handleSearchChange}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="school">School</Label>
                 <Select
                   onValueChange={handleSchoolChange}
@@ -363,18 +398,24 @@ const AdminSignup: React.FC = () => {
                   <SelectTrigger>
                     <SelectValue placeholder="Select a school" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-80">
                     <SelectGroup>
                       <SelectLabel>Schools</SelectLabel>
-                      {schools.map((school) => (
-                        <SelectItem 
-                          key={school.id} 
-                          value={school.id}
-                          disabled={school.claimed}
-                        >
-                          {school.name} {school.claimed && "(Already claimed)"}
-                        </SelectItem>
-                      ))}
+                      {filteredSchools.length > 0 ? (
+                        filteredSchools.map((school) => (
+                          <SelectItem 
+                            key={school.id} 
+                            value={school.id}
+                            disabled={school.claimed}
+                          >
+                            {school.name} {school.claimed && "(Already claimed)"}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="p-2 text-center text-muted-foreground">
+                          No schools found
+                        </div>
+                      )}
                     </SelectGroup>
                   </SelectContent>
                 </Select>
@@ -485,7 +526,7 @@ const AdminSignup: React.FC = () => {
       <header className="bg-white border-b py-4 px-6">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <h1 className="text-xl font-bold text-primary flex items-center">
-            <SchoolIcon className="mr-2" /> SchoolSignup Central
+            <SchoolIcon className="mr-2" /> Superlearn
           </h1>
         </div>
       </header>
@@ -508,7 +549,7 @@ const AdminSignup: React.FC = () => {
 
       <footer className="bg-white border-t py-4 px-6 text-center text-sm text-muted-foreground">
         <div className="max-w-7xl mx-auto">
-          &copy; {new Date().getFullYear()} SchoolSignup Central. All rights reserved.
+          &copy; {new Date().getFullYear()} Superlearn. All rights reserved.
         </div>
       </footer>
     </div>
