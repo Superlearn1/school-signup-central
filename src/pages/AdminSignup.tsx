@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSignUp, useClerk } from '@clerk/clerk-react';
@@ -226,7 +227,7 @@ const AdminSignup: React.FC = () => {
           await claimSchool(formData.schoolId!, result.createdUserId);
           
           console.log("Creating Clerk organization for school:", selectedSchool.name);
-          const clerkOrganization = await clerk.organization.create({
+          const clerkOrganization = await clerk.createOrganization({
             name: selectedSchool.name,
           });
           
