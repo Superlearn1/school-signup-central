@@ -227,7 +227,8 @@ const AdminSignup: React.FC = () => {
           await claimSchool(formData.schoolId!, result.createdUserId);
           
           console.log("Creating Clerk organization for school:", selectedSchool.name);
-          const clerkOrganization = await clerkClient.createOrganization({
+          // Fix: Use organizations resource to create the organization
+          const clerkOrganization = await clerkClient.organizations.createOrganization({
             name: selectedSchool.name,
           });
           
