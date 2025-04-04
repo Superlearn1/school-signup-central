@@ -1,16 +1,79 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useUser, useClerk, useOrganization } from '@clerk/clerk-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { School, Users, UserPlus, Settings, LogOut, CreditCard, Check } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { Subscription, Organization } from '@/types';
 
 const Dashboard: React.FC = () => {
   const { user } = useUser();
   const { signOut } = useClerk();
   const { organization } = useOrganization();
   const { toast } = useToast();
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [schoolId, setSchoolId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user?.id) return;
+
+      try {
+        setLoading(true);
+        let fetchedSchoolId = null;
+
+        // First try to get from organization
+        if (organization?.id) {
+          const { data: orgData } = await supabase
+            .from('organizations')
+            .select('school_id')
+            .eq('clerk_org_id', organization.id)
+            .single();
+
+          if (orgData?.school_id) {
+            fetchedSchoolId = orgData.school_id;
+          }
+        }
+
+        // Fallback to getting from claimed schools
+        if (!fetchedSchoolId) {
+          const { data: schoolData } = await supabase
+            .from('schools')
+            .select('id')
+            .eq('claimed_by_user_id', user.id)
+            .single();
+
+          if (schoolData?.id) {
+            fetchedSchoolId = schoolData.id;
+          }
+        }
+
+        if (fetchedSchoolId) {
+          setSchoolId(fetchedSchoolId);
+
+          // Fetch subscription data
+          const { data: subscriptionData } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('school_id', fetchedSchoolId)
+            .single();
+
+          if (subscriptionData) {
+            setSubscription(subscriptionData);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user, organization]);
 
   const handleInviteTeacher = () => {
     toast({

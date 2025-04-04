@@ -71,8 +71,47 @@ export type Database = {
           },
         ]
       }
+      organizations: {
+        Row: {
+          admin_id: string
+          clerk_org_id: string | null
+          created_at: string
+          id: string
+          name: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          admin_id: string
+          clerk_org_id?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          admin_id?: string
+          clerk_org_id?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organizations_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
+          clerk_user_id: string | null
           created_at: string
           full_name: string | null
           id: string
@@ -80,6 +119,7 @@ export type Database = {
           school_id: string
         }
         Insert: {
+          clerk_user_id?: string | null
           created_at?: string
           full_name?: string | null
           id: string
@@ -87,6 +127,7 @@ export type Database = {
           school_id: string
         }
         Update: {
+          clerk_user_id?: string | null
           created_at?: string
           full_name?: string | null
           id?: string
@@ -225,6 +266,7 @@ export type Database = {
       schools: {
         Row: {
           acara_id: string | null
+          claimed: boolean | null
           claimed_by_user_id: string | null
           clerk_org_id: string | null
           created_at: string
@@ -236,6 +278,7 @@ export type Database = {
         }
         Insert: {
           acara_id?: string | null
+          claimed?: boolean | null
           claimed_by_user_id?: string | null
           clerk_org_id?: string | null
           created_at?: string
@@ -247,6 +290,7 @@ export type Database = {
         }
         Update: {
           acara_id?: string | null
+          claimed?: boolean | null
           claimed_by_user_id?: string | null
           clerk_org_id?: string | null
           created_at?: string

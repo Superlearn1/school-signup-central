@@ -1,36 +1,102 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useUser } from '@clerk/clerk-react';
+import { useUser, useOrganization } from '@clerk/clerk-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Check, CreditCard, Shield } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const Subscription: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const { user } = useUser();
+  const { organization } = useOrganization();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [schoolId, setSchoolId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Fetch the school ID for the current user
+    const fetchSchoolId = async () => {
+      if (!user?.id) return;
+
+      try {
+        // First try to get from organization
+        if (organization?.id) {
+          const { data, error } = await supabase
+            .from('organizations')
+            .select('school_id')
+            .eq('clerk_org_id', organization.id)
+            .single();
+
+          if (data?.school_id) {
+            setSchoolId(data.school_id);
+            return;
+          }
+        }
+
+        // Fallback to getting from claimed schools
+        const { data, error } = await supabase
+          .from('schools')
+          .select('id')
+          .eq('claimed_by_user_id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching school:', error);
+          return;
+        }
+
+        if (data) {
+          setSchoolId(data.id);
+        }
+      } catch (error) {
+        console.error('Failed to fetch school ID:', error);
+      }
+    };
+
+    fetchSchoolId();
+  }, [user, organization]);
 
   const handleSubscribe = async (planId: string) => {
     try {
       setIsLoading(true);
       
+      if (!schoolId) {
+        toast({
+          variant: 'destructive',
+          title: 'Missing school information',
+          description: 'Could not find your school. Please try again later.',
+        });
+        return;
+      }
+      
       // This would connect to your Stripe checkout functionality
-      // For demonstration, we'll simulate a successful subscription
+      // For demonstration, we'll simulate a successful subscription update
+      
+      const seats = planId === 'basic' ? 500 : planId === 'pro' ? 1500 : 5000;
+      
+      // Update subscription status in Supabase
+      const { error } = await supabase
+        .from('subscriptions')
+        .update({ 
+          status: 'active',
+          total_student_seats: seats,
+          updated_at: new Date().toISOString()
+        })
+        .eq('school_id', schoolId);
+        
+      if (error) {
+        throw new Error(error.message);
+      }
       
       toast({
-        title: 'Redirecting to payment',
-        description: 'You will be redirected to complete your payment.',
+        title: 'Subscription activated',
+        description: 'Your subscription has been successfully activated.',
       });
       
-      // In a real implementation, you would:
-      // 1. Call your backend to create a Stripe checkout session
-      // 2. Redirect to the Stripe checkout page
-      // 3. Handle the webhook for successful payment
-      
-      // For demo purposes, we'll navigate to dashboard after 2 seconds
+      // Navigate to dashboard
       setTimeout(() => {
         navigate('/dashboard');
       }, 2000);

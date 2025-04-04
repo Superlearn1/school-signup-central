@@ -1,9 +1,15 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSignUp } from '@clerk/clerk-react';
 import { School, SignupFormData } from '@/types';
-import { fetchSchools, checkSchoolAvailability, claimSchool, createOrganization } from '@/services/api';
+import { 
+  fetchSchools, 
+  checkSchoolAvailability, 
+  claimSchool, 
+  createOrganization,
+  createProfile,
+  initializeSubscription
+} from '@/services/api';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -203,16 +209,43 @@ const AdminSignup: React.FC = () => {
       // Now let's make them the active user
       await setActive({ session: result.createdSessionId });
 
-      // Now claim the school
       const selectedSchool = schools.find(school => school.id === formData.schoolId);
+      
       if (selectedSchool && result.createdUserId) {
-        await claimSchool(formData.schoolId!, result.createdUserId);
-        await createOrganization(formData.schoolId!, result.createdUserId, selectedSchool.name);
-        
-        toast({
-          title: 'School claimed successfully',
-          description: 'You are now the administrator for this school.',
-        });
+        try {
+          // Claim the school
+          await claimSchool(formData.schoolId!, result.createdUserId);
+          
+          // Create organization in Supabase
+          const organization = await createOrganization(
+            formData.schoolId!, 
+            result.createdUserId, 
+            selectedSchool.name
+          );
+          
+          // Create admin profile
+          await createProfile(
+            result.createdUserId,
+            formData.schoolId!,
+            'admin',
+            formData.username
+          );
+          
+          // Initialize subscription
+          await initializeSubscription(formData.schoolId!);
+          
+          toast({
+            title: 'School setup completed',
+            description: 'You are now the administrator for this school.',
+          });
+        } catch (error: any) {
+          console.error('Failed to set up school:', error);
+          toast({
+            variant: 'destructive',
+            title: 'Setup failed',
+            description: error.message || 'An error occurred during school setup.',
+          });
+        }
       }
 
       // Move to subscription step
