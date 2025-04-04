@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,28 +13,9 @@ import Subscription from "./pages/Subscription";
 import Dashboard from "./pages/Dashboard";
 import StudentManagement from "./pages/StudentManagement";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const queryClient = new QueryClient();
-
-// Get Clerk publishable key from environment
-const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-
-// Display a helpful error message if the key is missing
-if (!clerkPubKey) {
-  console.error("ERROR: Clerk publishable key is missing! Make sure VITE_CLERK_PUBLISHABLE_KEY is set.");
-}
-
-// Clerk protected route component
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  return (
-    <>
-      <SignedIn>{children}</SignedIn>
-      <SignedOut>
-        <RedirectToSignIn />
-      </SignedOut>
-    </>
-  );
-};
 
 // Create a fallback component to show when Clerk key is missing
 const ClerkKeyMissing = () => {
@@ -63,7 +44,30 @@ const ClerkKeyMissing = () => {
   );
 };
 
+// Temporarily hardcoded key for development purposes
+// In production, this should be properly secured
+const TEMP_CLERK_KEY = "pk_test_YWN0aXZlLWJvYmNhdC01MS5jbGVyay5hY2NvdW50cy5kZXYk";
+
 const App = () => {
+  const [clerkPubKey, setClerkPubKey] = useState<string | null>(null);
+  
+  useEffect(() => {
+    // Try to get the key from environment
+    const envKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+    
+    if (envKey) {
+      setClerkPubKey(envKey);
+      return;
+    }
+    
+    // For development purposes only - in production, implement proper key management
+    // This is a temporary solution to get the app working for demonstration
+    setClerkPubKey(TEMP_CLERK_KEY);
+    
+    // Log warning about using temporary key
+    console.warn("Using temporary Clerk key for development. In production, secure your API keys properly.");
+  }, []);
+
   // If no Clerk key is available, show the error page
   if (!clerkPubKey) {
     return <ClerkKeyMissing />;
@@ -110,6 +114,18 @@ const App = () => {
         </TooltipProvider>
       </QueryClientProvider>
     </ClerkProvider>
+  );
+};
+
+// Clerk protected route component
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  return (
+    <>
+      <SignedIn>{children}</SignedIn>
+      <SignedOut>
+        <RedirectToSignIn />
+      </SignedOut>
+    </>
   );
 };
 
