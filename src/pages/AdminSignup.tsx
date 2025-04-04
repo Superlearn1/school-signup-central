@@ -24,7 +24,7 @@ import StepIndicator from '@/components/StepIndicator';
 
 const AdminSignup: React.FC = () => {
   const { isLoaded, signUp, setActive } = useSignUp();
-  const { client: clerkClient } = useClerk();
+  const clerk = useClerk();
   const [schools, setSchools] = useState<School[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [verifying, setVerifying] = useState<boolean>(false);
@@ -227,8 +227,8 @@ const AdminSignup: React.FC = () => {
           await claimSchool(formData.schoolId!, result.createdUserId);
           
           console.log("Creating Clerk organization for school:", selectedSchool.name);
-          // Fix: Use organizations resource to create the organization
-          const clerkOrganization = await clerkClient.organizations.createOrganization({
+          // Fixed: Use the clerk object from useClerk hook to access organizations
+          const clerkOrganization = await clerk.organization.createOrganization({
             name: selectedSchool.name,
           });
           
