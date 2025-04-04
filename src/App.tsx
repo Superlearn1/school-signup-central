@@ -1,4 +1,5 @@
 
+import React from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 const queryClient = new QueryClient();
 
 // Get Clerk publishable key from environment
-const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+const clerkPubKey = 'pk_test_cGxlYXNpbmctZG9iZXJtYW4tNDAuY2xlcmsuYWNjb3VudHMuZGV2JA';
 
 // Display a helpful error message if the key is missing
 if (!clerkPubKey) {
