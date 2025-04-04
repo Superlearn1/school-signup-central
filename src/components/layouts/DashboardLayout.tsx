@@ -28,6 +28,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
     signOut();
   };
 
+  const handleInviteTeacher = () => {
+    // This will be handled by the component that uses this layout
+    const event = new CustomEvent('inviteTeacher');
+    window.dispatchEvent(event);
+  };
+
   return (
     <div className="min-h-screen bg-secondary/30 flex flex-col">
       <header className="bg-white border-b py-4 px-6">
@@ -79,7 +85,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
             </nav>
             
             <div className="mt-6 pt-6 border-t">
-              <Button className="w-full justify-start" variant="outline" size="sm">
+              <Button className="w-full justify-start" variant="outline" size="sm" onClick={handleInviteTeacher}>
                 <UserPlus className="h-4 w-4 mr-2" />
                 Invite Teacher
               </Button>
