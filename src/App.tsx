@@ -86,7 +86,7 @@ const App = () => {
         },
       }}
       // Ensure organization features are properly activated
-      organizationFeatures={{
+      organization={{
         enabled: true
       }}
     >
