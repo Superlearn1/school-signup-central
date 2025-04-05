@@ -44,10 +44,6 @@ const ClerkKeyMissing = () => {
   );
 };
 
-// Temporarily hardcoded key for development purposes
-// In production, this should be properly secured
-const TEMP_CLERK_KEY = "pk_test_cGxlYXNpbmctZG9iZXJtYW4tNDAuY2xlcmsuYWNjb3VudHMuZGV2JA";
-
 const App = () => {
   const [clerkPubKey, setClerkPubKey] = useState<string | null>(null);
   
@@ -61,14 +57,7 @@ const App = () => {
       return;
     }
     
-    // For development purposes only - in production, implement proper key management
-    // This is a temporary solution to get the app working for demonstration
-    console.log("Using fallback Clerk key for development");
-    setClerkPubKey(TEMP_CLERK_KEY);
-    console.log("Clerk key being used:", TEMP_CLERK_KEY);
-    
-    // Log warning about using temporary key
-    console.warn("Using temporary Clerk key for development. In production, secure your API keys properly.");
+    console.warn("No Clerk key found in environment variables");
   }, []);
 
   // If no Clerk key is available, show the error page
@@ -79,15 +68,10 @@ const App = () => {
   return (
     <ClerkProvider 
       publishableKey={clerkPubKey}
-      // Add explicit settings for Clerk including organization settings
       appearance={{
         elements: {
           organizationSwitcherTrigger: "py-2 px-4"
         },
-      }}
-      // Ensure organization features are properly activated
-      organization={{
-        enabled: true
       }}
     >
       <QueryClientProvider client={queryClient}>
