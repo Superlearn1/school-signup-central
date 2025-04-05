@@ -1,5 +1,5 @@
 
-import { Session } from "@clerk/clerk-react";
+import { ActiveSession as Session } from "@clerk/clerk-react";
 
 /**
  * Session management service for Superlearn
@@ -52,3 +52,4 @@ class SessionService {
 }
 
 export default SessionService;
+
