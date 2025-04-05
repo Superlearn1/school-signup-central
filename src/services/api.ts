@@ -50,7 +50,7 @@ export const updateSchoolWithClerkOrgId = async (schoolId: string, clerkOrgId: s
   const { error } = await supabase.rpc('update_school_and_org', {
     p_school_id: schoolId,
     p_clerk_org_id: clerkOrgId
-  }).single();
+  });
 
   if (error) {
     console.error('Error updating school with Clerk organization ID:', error);

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSignUp, useClerk } from '@clerk/clerk-react';
@@ -231,13 +230,9 @@ const AdminSignup: React.FC = () => {
           
           console.log("Creating Clerk organization for school:", selectedSchool.name);
           
-          // Create the Clerk organization
+          // Create the Clerk organization - Fixed Error 1: Removed publicMetadata
           const clerkOrganization = await clerk.createOrganization({
-            name: selectedSchool.name,
-            // Add schoolId to the organization's metadata for easy reference
-            publicMetadata: {
-              schoolId: formData.schoolId
-            }
+            name: selectedSchool.name
           });
           
           if (!clerkOrganization || !clerkOrganization.id) {
