@@ -9,7 +9,8 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
-export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
+// Change from named export to default export for consistency
+const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const { user } = useUser();
   const { signOut } = useClerk();
   const { organization } = useOrganization();
@@ -109,3 +110,5 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
     </div>
   );
 };
+
+export default DashboardLayout;

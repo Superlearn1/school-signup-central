@@ -7,7 +7,8 @@ import { School, Users, UserPlus, Settings, LogOut, CreditCard, Check } from 'lu
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Subscription } from '@/types';
-import { DashboardLayout } from '@/components/layouts/DashboardLayout';
+// Fix the import path - make sure it matches the actual path
+import DashboardLayout from '@/components/layouts/DashboardLayout';
 import TeacherInviteModal from '@/components/TeacherInviteModal';
 
 const Dashboard: React.FC = () => {
