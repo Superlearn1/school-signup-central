@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useOrganization } from '@clerk/clerk-react';
 import { useToast } from '@/hooks/use-toast';
@@ -50,32 +49,23 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
         throw new Error('Organization ID is missing');
       }
       
-      // Get the school ID either from metadata or from database
+      // Get the school ID either from database
       let schoolId: string | null = null;
       
-      // Check if schoolId is in the organization's metadata
-      if (organization.publicMetadata && typeof organization.publicMetadata === 'object') {
-        schoolId = (organization.publicMetadata as any).schoolId as string || null;
+      // Try to find school ID from organizations table first
+      const { data: orgData, error: orgError } = await supabase
+        .from('organizations')
+        .select('school_id')
+        .eq('clerk_org_id', organization.id)
+        .maybeSingle();
+      
+      if (orgError) {
+        console.error("Error finding organization:", orgError);
       }
-      
-      console.log("School ID from organization metadata:", schoolId);
-      
-      // If no school ID in metadata, try to find it from database
-      if (!schoolId) {
-        const { data: orgData, error: orgError } = await supabase
-          .from('organizations')
-          .select('school_id')
-          .eq('clerk_org_id', organization.id)
-          .maybeSingle();
         
-        if (orgError) {
-          console.error("Error finding organization:", orgError);
-        }
-          
-        if (orgData?.school_id) {
-          schoolId = orgData.school_id as string;
-          console.log("School ID found from database:", schoolId);
-        }
+      if (orgData?.school_id) {
+        schoolId = orgData.school_id as string;
+        console.log("School ID found from database:", schoolId);
       }
       
       // As a last resort, check the schools table

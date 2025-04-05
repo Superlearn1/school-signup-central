@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { School, Organization, Profile, Subscription, Student, Resource, ResourceAdaptation, NCCDEvidence } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -94,19 +93,20 @@ export const createOrganization = async (schoolId: string, adminId: string, scho
         updated_at: new Date().toISOString()
       }
     ])
-    .select();
+    .select()
+    .single();
 
   if (error) {
     console.error('Error creating organization:', error);
     throw error;
   }
 
-  if (!data || data.length === 0) {
+  if (!data) {
     throw new Error('Failed to create organization');
   }
   
   console.log('Organization created successfully');
-  return data[0] as Organization;
+  return data as Organization;
 };
 
 export const createProfile = async (userId: string, schoolId: string, role: string, fullName?: string): Promise<Profile> => {
