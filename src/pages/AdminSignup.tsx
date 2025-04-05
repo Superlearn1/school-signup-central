@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSignUp, useClerk } from '@clerk/clerk-react';
@@ -179,11 +178,11 @@ const AdminSignup: React.FC = () => {
         return;
       }
 
+      // Updated: Remove username parameter and use firstName instead
       await signUp.create({
         emailAddress: formData.email,
         password: formData.password,
-        username: formData.username,
-        firstName: formData.username,
+        firstName: formData.username, // Use username as firstName
       });
 
       await signUp.prepareEmailAddressVerification({
