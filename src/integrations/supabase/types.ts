@@ -405,13 +405,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      update_school_and_org: {
-        Args: {
-          p_school_id: string
-          p_clerk_org_id: string
-        }
-        Returns: undefined
-      }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never

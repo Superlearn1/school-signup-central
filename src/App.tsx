@@ -6,8 +6,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ClerkProvider, SignedIn, SignedOut, RedirectToSignIn } from "@clerk/clerk-react";
-import { AuthProvider } from "@/contexts/AuthContext";
-import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AdminSignup from "./pages/AdminSignup";
@@ -17,18 +15,7 @@ import StudentManagement from "./pages/StudentManagement";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 60 * 1000, // 1 minute
-      retry: 1,
-    },
-  },
-});
-
-// Hardcoded key as fallback for development
-// In production, this should come from environment variables
-const FALLBACK_CLERK_KEY = "pk_test_cGxlYXNpbmctZG9iZXJtYW4tNDAuY2xlcmsuYWNjb3VudHMuZGV2JA";
+const queryClient = new QueryClient();
 
 // Create a fallback component to show when Clerk key is missing
 const ClerkKeyMissing = () => {
@@ -57,6 +44,10 @@ const ClerkKeyMissing = () => {
   );
 };
 
+// Temporarily hardcoded key for development purposes
+// In production, this should be properly secured
+const TEMP_CLERK_KEY = "pk_test_cGxlYXNpbmctZG9iZXJtYW4tNDAuY2xlcmsuYWNjb3VudHMuZGV2JA";
+
 const App = () => {
   const [clerkPubKey, setClerkPubKey] = useState<string | null>(null);
   
@@ -70,9 +61,13 @@ const App = () => {
       return;
     }
     
-    console.warn("No Clerk key found in environment variables, using fallback key");
-    // Use fallback key for development
-    setClerkPubKey(FALLBACK_CLERK_KEY);
+    // For development purposes only - in production, implement proper key management
+    // This is a temporary solution to get the app working for demonstration
+    console.log("Using fallback Clerk key for development");
+    setClerkPubKey(TEMP_CLERK_KEY);
+    
+    // Log warning about using temporary key
+    console.warn("Using temporary Clerk key for development. In production, secure your API keys properly.");
   }, []);
 
   // If no Clerk key is available, show the error page
@@ -80,58 +75,59 @@ const App = () => {
     return <ClerkKeyMissing />;
   }
 
-  // It's crucial to have BrowserRouter as the outermost router provider
-  // before any components that use router hooks
   return (
-    <BrowserRouter>
-      <ClerkProvider 
-        publishableKey={clerkPubKey}
-        appearance={{
-          elements: {
-            organizationSwitcherTrigger: "py-2 px-4"
-          },
-        }}
-      >
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/admin-signup" element={<AdminSignup />} />
-                <Route 
-                  path="/subscription" 
-                  element={
-                    <ProtectedRoute>
-                      <Subscription />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/dashboard" 
-                  element={
-                    <ProtectedRoute>
-                      <Dashboard />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/students" 
-                  element={
-                    <ProtectedRoute>
-                      <StudentManagement />
-                    </ProtectedRoute>
-                  } 
-                />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </TooltipProvider>
-          </AuthProvider>
-        </QueryClientProvider>
-      </ClerkProvider>
-    </BrowserRouter>
+    <ClerkProvider publishableKey={clerkPubKey}>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/admin-signup" element={<AdminSignup />} />
+              <Route 
+                path="/subscription" 
+                element={
+                  <ProtectedRoute>
+                    <Subscription />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/dashboard" 
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/students" 
+                element={
+                  <ProtectedRoute>
+                    <StudentManagement />
+                  </ProtectedRoute>
+                } 
+              />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ClerkProvider>
+  );
+};
+
+// Clerk protected route component
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  return (
+    <>
+      <SignedIn>{children}</SignedIn>
+      <SignedOut>
+        <RedirectToSignIn />
+      </SignedOut>
+    </>
   );
 };
 

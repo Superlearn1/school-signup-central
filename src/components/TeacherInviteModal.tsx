@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useOrganization } from '@clerk/clerk-react';
 import { useToast } from '@/hooks/use-toast';
@@ -16,7 +17,7 @@ interface TeacherInviteModalProps {
 const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { organization, isLoaded } = useOrganization();
+  const { organization } = useOrganization();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,9 +31,9 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
       return;
     }
 
-    if (!isLoaded || !organization) {
+    if (!organization) {
       toast({
-        title: 'Organization not ready',
+        title: 'Organization not found',
         description: 'Unable to send invitation without an organization',
         variant: 'destructive',
       });
@@ -42,59 +43,11 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
     setIsLoading(true);
 
     try {
-      console.log("Organization ID for invitations:", organization.id);
-      
-      // First, ensure we have a valid organization ID to work with
-      if (!organization.id) {
-        throw new Error('Organization ID is missing');
-      }
-      
-      // Get the school ID either from database
-      let schoolId: string | null = null;
-      
-      // Try to find school ID from organizations table first
-      const { data: orgData, error: orgError } = await supabase
-        .from('organizations')
-        .select('school_id')
-        .eq('clerk_org_id', organization.id)
-        .maybeSingle();
-      
-      if (orgError) {
-        console.error("Error finding organization:", orgError);
-      }
-        
-      if (orgData?.school_id) {
-        schoolId = orgData.school_id as string;
-        console.log("School ID found from database:", schoolId);
-      }
-      
-      // As a last resort, check the schools table
-      if (!schoolId) {
-        const { data: schoolData, error: schoolError } = await supabase
-          .from('schools')
-          .select('id')
-          .eq('clerk_org_id', organization.id)
-          .maybeSingle();
-        
-        if (schoolError) {
-          console.error("Error finding school:", schoolError);
-        }
-        
-        if (schoolData?.id) {
-          schoolId = schoolData.id;
-          console.log("School ID found from schools table:", schoolId);
-        }
-      }
-      
-      if (!schoolId) {
-        throw new Error('Could not determine school ID for this invitation');
-      }
-
-      // Check if we have available teacher seats
+      // First check if we have available teacher seats
       const { data: subscriptionData, error: subscriptionError } = await supabase
         .from('subscriptions')
         .select('total_teacher_seats, used_teacher_seats')
-        .eq('school_id', schoolId)
+        .eq('school_id', organization.publicMetadata.schoolId as string)
         .maybeSingle();
       
       if (subscriptionError) {
@@ -110,13 +63,11 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
       }
 
       // Send invitation via Clerk
-      console.log("Sending invitation to:", email);
-      const invitation = await organization.inviteMember({
+      const invitation = await organization.createMembershipInvitation({
         emailAddress: email,
-        role: "org:teacher"
+        role: 'org:teacher',
+        redirectUrl: window.location.origin + '/dashboard',
       });
-      
-      console.log("Invitation sent:", invitation);
 
       // Update used_teacher_seats in Supabase
       // Note: Optimistically increment the count; Clerk webhook will validate later
@@ -125,7 +76,7 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
         .update({ 
           used_teacher_seats: subscriptionData.used_teacher_seats + 1 
         })
-        .eq('school_id', schoolId);
+        .eq('school_id', organization.publicMetadata.schoolId as string);
 
       if (updateError) {
         console.error('Failed to update seat count:', updateError);
@@ -143,9 +94,9 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
     } catch (error: any) {
       console.error('Teacher invitation error:', error);
       toast({
-        variant: 'destructive',
         title: 'Invitation failed',
         description: error.message || 'Failed to send invitation. Please try again.',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);

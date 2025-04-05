@@ -13,112 +13,51 @@ import TeacherInviteModal from '@/components/TeacherInviteModal';
 const Dashboard: React.FC = () => {
   const { user } = useUser();
   const { signOut } = useClerk();
-  const { organization, isLoaded: isOrgLoaded } = useOrganization();
+  const { organization } = useOrganization();
   const { toast } = useToast();
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [schoolId, setSchoolId] = useState<string | null>(null);
-  const [schoolName, setSchoolName] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [teacherCount, setTeacherCount] = useState(0);
 
-  // Debug organization data
-  useEffect(() => {
-    if (organization) {
-      console.log("Current organization:", {
-        id: organization.id,
-        name: organization.name,
-        publicMetadata: organization.publicMetadata
-      });
-    } else {
-      console.log("No organization loaded yet");
-    }
-  }, [organization, isOrgLoaded]);
-
   useEffect(() => {
     const fetchData = async () => {
-      if (!user?.id || !isOrgLoaded) return;
+      if (!user?.id) return;
 
       try {
         setLoading(true);
         let fetchedSchoolId = null;
-        let fetchedSchoolName = '';
 
-        // First try to get from organization metadata
-        if (organization?.id && organization.publicMetadata) {
-          console.log("Organization found:", organization.id, organization.name);
-          
-          if (typeof organization.publicMetadata === 'object' && (organization.publicMetadata as any).schoolId) {
-            fetchedSchoolId = (organization.publicMetadata as any).schoolId;
-            console.log("School ID found from organization metadata:", fetchedSchoolId);
-          }
-        }
-
-        // If not found in metadata, try organizations table
-        if (!fetchedSchoolId && organization?.id) {
-          console.log("Trying to find school ID from organizations table");
+        // First try to get from organization
+        if (organization?.id) {
+          // Use raw query to avoid type issues
           const { data: orgData } = await supabase
             .from('organizations')
-            .select('school_id, name')
+            .select('school_id')
             .eq('clerk_org_id', organization.id)
             .maybeSingle();
 
           if (orgData?.school_id) {
             fetchedSchoolId = orgData.school_id;
-            if (orgData.name) fetchedSchoolName = orgData.name;
-            console.log("School ID found from organizations table:", fetchedSchoolId);
-          }
-        }
-
-        // Try schools table if still not found
-        if (!fetchedSchoolId && organization?.id) {
-          console.log("Trying to find school ID from schools table");
-          const { data: schoolData } = await supabase
-            .from('schools')
-            .select('id, name')
-            .eq('clerk_org_id', organization.id)
-            .maybeSingle();
-
-          if (schoolData?.id) {
-            fetchedSchoolId = schoolData.id;
-            if (schoolData.name) fetchedSchoolName = schoolData.name;
-            console.log("School ID found from schools table:", fetchedSchoolId);
           }
         }
 
         // Fallback to getting from claimed schools
-        if (!fetchedSchoolId && user?.id) {
-          console.log("Trying to find from claimed schools");
-          const { data: claimedSchoolData } = await supabase
+        if (!fetchedSchoolId) {
+          const { data: schoolData } = await supabase
             .from('schools')
-            .select('id, name')
+            .select('id')
             .eq('claimed_by_user_id', user.id)
             .maybeSingle();
 
-          if (claimedSchoolData?.id) {
-            fetchedSchoolId = claimedSchoolData.id;
-            if (claimedSchoolData.name) fetchedSchoolName = claimedSchoolData.name;
-            console.log("School ID found from claimed schools:", fetchedSchoolId);
+          if (schoolData?.id) {
+            fetchedSchoolId = schoolData.id;
           }
         }
 
         if (fetchedSchoolId) {
           setSchoolId(fetchedSchoolId);
-          
-          // If we don't have a name yet but have a school ID, get the name
-          if (!fetchedSchoolName) {
-            const { data: schoolNameData } = await supabase
-              .from('schools')
-              .select('name')
-              .eq('id', fetchedSchoolId)
-              .maybeSingle();
-              
-            if (schoolNameData?.name) {
-              fetchedSchoolName = schoolNameData.name;
-            }
-          }
-          
-          setSchoolName(fetchedSchoolName || (organization?.name || 'Your School'));
 
           // Fetch subscription data
           const { data: subscriptionData } = await supabase
@@ -131,33 +70,20 @@ const Dashboard: React.FC = () => {
             setSubscription(subscriptionData as Subscription);
           }
           
-          // Fetch teacher count from Clerk
+          // Fetch teacher count
           if (organization) {
             try {
               const members = await organization.getMemberships();
-              console.log("Organization members:", members.data.length);
-              
               // Count members with teacher role
               const teacherMembers = members.data.filter(
                 member => member.role === 'org:teacher' || 
-                          (member.publicMetadata && (member.publicMetadata as any).role === 'teacher')
+                          (member.pending && member.publicMetadata.role === 'teacher')
               );
-              
-              console.log("Teacher members found:", teacherMembers.length);
               setTeacherCount(teacherMembers.length);
             } catch (err) {
               console.error("Error fetching organization members:", err);
             }
-          } else {
-            console.warn("No organization found for user");
           }
-        } else {
-          console.error("No school ID found for user");
-          toast({
-            variant: 'destructive',
-            title: 'School not found',
-            description: 'We could not find your school information. Please contact support.',
-          });
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -167,17 +93,9 @@ const Dashboard: React.FC = () => {
     };
 
     fetchData();
-  }, [user, organization, isOrgLoaded, toast]);
+  }, [user, organization]);
 
   const handleInviteTeacher = () => {
-    if (!organization) {
-      toast({
-        variant: 'destructive',
-        title: 'Organization not found',
-        description: 'Cannot invite teachers without an active organization',
-      });
-      return;
-    }
     setShowInviteModal(true);
   };
 
@@ -187,7 +105,7 @@ const Dashboard: React.FC = () => {
       organization.getMemberships().then(result => {
         const teacherMembers = result.data.filter(
           member => member.role === 'org:teacher' || 
-                  (member.publicMetadata && (member.publicMetadata as any).role === 'teacher')
+                    (member.pending && member.publicMetadata.role === 'teacher')
         );
         setTeacherCount(teacherMembers.length);
       }).catch(err => {

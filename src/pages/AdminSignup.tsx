@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSignUp, useClerk } from '@clerk/clerk-react';
+import { useSignUp } from '@clerk/clerk-react';
 import { School, SignupFormData } from '@/types';
 import { 
   fetchSchools, 
@@ -8,8 +9,7 @@ import {
   claimSchool, 
   createOrganization,
   createProfile,
-  initializeSubscription,
-  updateSchoolWithClerkOrgId
+  initializeSubscription
 } from '@/services/api';
 
 import { Button } from '@/components/ui/button';
@@ -19,12 +19,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertCircle, School as SchoolIcon, LucideMailCheck, CreditCard, Users, Search } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import StepIndicator from '@/components/StepIndicator';
 
 const AdminSignup: React.FC = () => {
   const { isLoaded, signUp, setActive } = useSignUp();
-  const clerk = useClerk();
   const [schools, setSchools] = useState<School[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [verifying, setVerifying] = useState<boolean>(false);
@@ -70,6 +69,7 @@ const AdminSignup: React.FC = () => {
     loadSchools();
   }, [toast]);
 
+  // Filter schools based on search query
   useEffect(() => {
     if (searchQuery.trim() === '') {
       setFilteredSchools(schools);
@@ -87,6 +87,7 @@ const AdminSignup: React.FC = () => {
       ...formData,
       [name]: value,
     });
+    // Clear error when typing
     if (errors[name as keyof typeof errors]) {
       setErrors({
         ...errors,
@@ -117,6 +118,7 @@ const AdminSignup: React.FC = () => {
     let isValid = true;
 
     if (currentStep === 0) {
+      // Validate account information
       if (!formData.username.trim()) {
         newErrors.username = 'Username is required';
         isValid = false;
@@ -136,10 +138,12 @@ const AdminSignup: React.FC = () => {
         isValid = false;
       }
     } else if (currentStep === 1) {
+      // Validate school selection
       if (!formData.schoolId) {
         newErrors.schoolId = 'Please select a school';
         isValid = false;
       } else {
+        // Check if school is available
         try {
           const isAvailable = await checkSchoolAvailability(formData.schoolId);
           if (!isAvailable) {
@@ -157,6 +161,7 @@ const AdminSignup: React.FC = () => {
         }
       }
     } else if (currentStep === 2) {
+      // Validate verification code
       if (!code.trim()) {
         newErrors.code = 'Verification code is required';
         isValid = false;
@@ -178,13 +183,15 @@ const AdminSignup: React.FC = () => {
         return;
       }
 
-      // Updated: Remove username parameter and use firstName instead
+      // Modified: Remove username from the signUp.create call if not supported by Clerk
       await signUp.create({
         emailAddress: formData.email,
         password: formData.password,
-        firstName: formData.username, // Use username as firstName
+        // Only include username if needed for your Clerk instance
+        // username: formData.username,
       });
 
+      // Start email verification
       await signUp.prepareEmailAddressVerification({
         strategy: 'email_code',
       });
@@ -220,89 +227,25 @@ const AdminSignup: React.FC = () => {
         throw new Error('Email verification failed');
       }
 
-      // Set the active session for the newly created user
+      // The user has been created and their email verified
+      // Now let's make them the active user
       await setActive({ session: result.createdSessionId });
 
       const selectedSchool = schools.find(school => school.id === formData.schoolId);
       
       if (selectedSchool && result.createdUserId) {
         try {
-          console.log("Starting school setup with userId:", result.createdUserId);
-          
-          // First, claim the school
+          // Claim the school
           await claimSchool(formData.schoolId!, result.createdUserId);
           
-          console.log("School claimed successfully, creating Clerk organization for school:", selectedSchool.name);
-          
-          // Create the Clerk organization
-          const clerkOrganization = await clerk.createOrganization({
-            name: selectedSchool.name,
-            // Adding slug for better URLs
-            slug: selectedSchool.name.toLowerCase().replace(/\s+/g, '-')
-          });
-          
-          if (!clerkOrganization || !clerkOrganization.id) {
-            throw new Error('Failed to create Clerk organization');
-          }
-          
-          console.log("Clerk organization created with ID:", clerkOrganization.id);
-          
-          // Add a delay to ensure the organization is fully created before adding a member
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          
-          // Get the available organization roles for debugging
-          try {
-            const roles = await clerk.organization.getRoles();
-            console.log("Available organization roles:", roles);
-          } catch (rolesError) {
-            console.error("Failed to get organization roles:", rolesError);
-            // Continue with the flow, as this is just for debugging
-          }
-          
-          // Try to add the user with 'admin' role first
-          try {
-            console.log("Attempting to add member with role 'admin'");
-            await clerkOrganization.addMember({
-              userId: result.createdUserId,
-              role: "admin"
-            });
-            console.log("Successfully added user as admin to organization");
-          } catch (adminRoleError) {
-            console.error("Failed to add member with 'admin' role:", adminRoleError);
-            
-            // Try with 'org:admin' as fallback
-            try {
-              console.log("Attempting to add member with role 'org:admin'");
-              await clerkOrganization.addMember({
-                userId: result.createdUserId,
-                role: "org:admin"
-              });
-              console.log("Successfully added user as org:admin to organization");
-            } catch (orgAdminRoleError) {
-              console.error("Failed with 'org:admin' role as well:", orgAdminRoleError);
-              throw new Error(`Failed to add member to organization: ${orgAdminRoleError.message}`);
-            }
-          }
-          
-          // Set this organization as active for the current user
-          await clerk.setActive({ organization: clerkOrganization.id });
-          console.log("Set organization as active for user");
-          
-          // Update the school record with the clerk_org_id first
-          console.log("Updating school with Clerk org ID");
-          await updateSchoolWithClerkOrgId(formData.schoolId!, clerkOrganization.id);
-          
-          // Create organization record in database
-          console.log("Creating organization record in Supabase");
+          // Create organization in Supabase
           const organization = await createOrganization(
             formData.schoolId!, 
             result.createdUserId, 
-            selectedSchool.name,
-            clerkOrganization.id
+            selectedSchool.name
           );
           
-          // Create the admin profile
-          console.log("Creating admin profile in Supabase");
+          // Create admin profile
           await createProfile(
             result.createdUserId,
             formData.schoolId!,
@@ -311,15 +254,12 @@ const AdminSignup: React.FC = () => {
           );
           
           // Initialize subscription
-          console.log("Initializing subscription record");
           await initializeSubscription(formData.schoolId!);
           
           toast({
             title: 'School setup completed',
             description: 'You are now the administrator for this school.',
           });
-          
-          console.log("Signup and onboarding completed successfully");
         } catch (error: any) {
           console.error('Failed to set up school:', error);
           toast({
@@ -330,6 +270,7 @@ const AdminSignup: React.FC = () => {
         }
       }
 
+      // Move to subscription step
       setCurrentStep(3);
     } catch (error: any) {
       console.error('Verification error:', error);
@@ -348,6 +289,7 @@ const AdminSignup: React.FC = () => {
   };
 
   const handleStartSubscription = () => {
+    // Redirect to subscription page
     navigate('/subscription');
   };
 
