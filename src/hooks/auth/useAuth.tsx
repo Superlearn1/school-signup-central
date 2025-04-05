@@ -3,7 +3,7 @@ import { useUser, useClerk, useOrganization } from "@clerk/clerk-react";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import UserService from "@/services/auth/userService";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Profile } from "@/types";
 
 export const useAuth = () => {
