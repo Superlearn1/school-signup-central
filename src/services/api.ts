@@ -45,18 +45,43 @@ export const claimSchool = async (schoolId: string, clerkUserId: string): Promis
 };
 
 export const updateSchoolWithClerkOrgId = async (schoolId: string, clerkOrgId: string): Promise<void> => {
-  const { error } = await supabase
-    .from('schools')
-    .update({ clerk_org_id: clerkOrgId })
-    .eq('id', schoolId);
+  console.log(`Updating school ${schoolId} with Clerk organization ID ${clerkOrgId}`);
+  
+  // Using a transaction to ensure data consistency
+  const { error } = await supabase.rpc('update_school_and_org', {
+    p_school_id: schoolId,
+    p_clerk_org_id: clerkOrgId
+  }).single();
 
   if (error) {
     console.error('Error updating school with Clerk organization ID:', error);
-    throw error;
+    
+    // Fallback to individual updates if the RPC fails
+    const { error: schoolError } = await supabase
+      .from('schools')
+      .update({ clerk_org_id: clerkOrgId })
+      .eq('id', schoolId);
+    
+    if (schoolError) {
+      throw schoolError;
+    }
+    
+    // Also update the organization record if exists
+    const { error: orgError } = await supabase
+      .from('organizations')
+      .update({ clerk_org_id: clerkOrgId })
+      .eq('school_id', schoolId);
+    
+    if (orgError) {
+      console.error('Warning: Could not update organization table:', orgError);
+      // Don't throw, as the school update succeeded
+    }
   }
 };
 
 export const createOrganization = async (schoolId: string, adminId: string, schoolName: string, clerkOrgId?: string): Promise<Organization> => {
+  console.log(`Creating organization for school ${schoolId} with admin ${adminId} and Clerk org ID ${clerkOrgId || 'none'}`);
+  
   const { data, error } = await supabase
     .from('organizations')
     .insert([
@@ -79,7 +104,8 @@ export const createOrganization = async (schoolId: string, adminId: string, scho
   if (!data || data.length === 0) {
     throw new Error('Failed to create organization');
   }
-
+  
+  console.log('Organization created successfully');
   return data[0] as Organization;
 };
 

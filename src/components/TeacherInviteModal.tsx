@@ -45,34 +45,66 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
     try {
       console.log("Organization ID for invitations:", organization.id);
       
-      // Check for metadata to get school ID
-      const schoolId = organization.publicMetadata?.schoolId as string || null;
+      // First, ensure we have a valid organization ID to work with
+      if (!organization.id) {
+        throw new Error('Organization ID is missing');
+      }
+      
+      // Get the school ID either from metadata or from database
+      let schoolId: string | null = null;
+      
+      // Check if schoolId is in the organization's metadata
+      if (organization.publicMetadata && typeof organization.publicMetadata === 'object') {
+        schoolId = (organization.publicMetadata as any).schoolId as string || null;
+      }
+      
       console.log("School ID from organization metadata:", schoolId);
       
       // If no school ID in metadata, try to find it from database
-      let dbSchoolId = schoolId;
-      if (!dbSchoolId) {
-        const { data: orgData } = await supabase
+      if (!schoolId) {
+        const { data: orgData, error: orgError } = await supabase
           .from('organizations')
           .select('school_id')
           .eq('clerk_org_id', organization.id)
           .maybeSingle();
+        
+        if (orgError) {
+          console.error("Error finding organization:", orgError);
+        }
           
         if (orgData?.school_id) {
-          dbSchoolId = orgData.school_id as string;
-          console.log("School ID found from database:", dbSchoolId);
+          schoolId = orgData.school_id as string;
+          console.log("School ID found from database:", schoolId);
         }
       }
       
-      if (!dbSchoolId) {
+      // As a last resort, check the schools table
+      if (!schoolId) {
+        const { data: schoolData, error: schoolError } = await supabase
+          .from('schools')
+          .select('id')
+          .eq('clerk_org_id', organization.id)
+          .maybeSingle();
+        
+        if (schoolError) {
+          console.error("Error finding school:", schoolError);
+        }
+        
+        if (schoolData?.id) {
+          schoolId = schoolData.id;
+          console.log("School ID found from schools table:", schoolId);
+        }
+      }
+      
+      if (!schoolId) {
         throw new Error('Could not determine school ID for this invitation');
       }
 
-      // First check if we have available teacher seats
+      // Check if we have available teacher seats
       const { data: subscriptionData, error: subscriptionError } = await supabase
         .from('subscriptions')
         .select('total_teacher_seats, used_teacher_seats')
-        .eq('school_id', dbSchoolId)
+        .eq('school_id', schoolId)
         .maybeSingle();
       
       if (subscriptionError) {
@@ -91,9 +123,7 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
       console.log("Sending invitation to:", email);
       const invitation = await organization.inviteMember({
         emailAddress: email,
-        role: "org:teacher",
-        // Clerk no longer supports publicMetadata in inviteMember params
-        // We'll need to set this when the user accepts the invitation
+        role: "org:teacher"
       });
       
       console.log("Invitation sent:", invitation);
@@ -105,7 +135,7 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
         .update({ 
           used_teacher_seats: subscriptionData.used_teacher_seats + 1 
         })
-        .eq('school_id', dbSchoolId);
+        .eq('school_id', schoolId);
 
       if (updateError) {
         console.error('Failed to update seat count:', updateError);
