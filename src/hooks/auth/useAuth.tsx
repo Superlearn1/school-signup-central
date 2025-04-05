@@ -15,6 +15,7 @@ export const useAuth = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Load user profile from Supabase when Clerk user is available
   useEffect(() => {

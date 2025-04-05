@@ -80,17 +80,19 @@ const App = () => {
     return <ClerkKeyMissing />;
   }
 
+  // It's crucial to have BrowserRouter as the outermost router provider
+  // before any components that use router hooks
   return (
-    <ClerkProvider 
-      publishableKey={clerkPubKey}
-      appearance={{
-        elements: {
-          organizationSwitcherTrigger: "py-2 px-4"
-        },
-      }}
-    >
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
+    <BrowserRouter>
+      <ClerkProvider 
+        publishableKey={clerkPubKey}
+        appearance={{
+          elements: {
+            organizationSwitcherTrigger: "py-2 px-4"
+          },
+        }}
+      >
+        <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <TooltipProvider>
               <Toaster />
@@ -127,9 +129,9 @@ const App = () => {
               </Routes>
             </TooltipProvider>
           </AuthProvider>
-        </BrowserRouter>
-      </QueryClientProvider>
-    </ClerkProvider>
+        </QueryClientProvider>
+      </ClerkProvider>
+    </BrowserRouter>
   );
 };
 

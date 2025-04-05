@@ -1,5 +1,6 @@
 
-import { Session } from "@clerk/clerk-react";
+// We'll avoid importing Session type directly as it's not properly exported
+// Instead we'll use the any type for now until we can find the correct type
 
 /**
  * Session management service for Superlearn
@@ -9,7 +10,7 @@ class SessionService {
   /**
    * Store session data securely
    */
-  static setSession(session: Session | null) {
+  static setSession(session: any | null) {
     // We use Clerk's built-in session management
     // This is mainly a wrapper for potential additional session processing
     if (session) {
@@ -31,7 +32,7 @@ class SessionService {
   /**
    * Check if the current session is valid
    */
-  static isSessionValid(session: Session | null) {
+  static isSessionValid(session: any | null) {
     if (!session) return false;
     
     // Clerk handles session expiration automatically
