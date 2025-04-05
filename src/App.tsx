@@ -17,6 +17,10 @@ import { supabase } from "@/integrations/supabase/client";
 
 const queryClient = new QueryClient();
 
+// Hardcoded key as fallback for development
+// In production, this should come from environment variables
+const FALLBACK_CLERK_KEY = "pk_test_cGxlYXNpbmctZG9iZXJtYW4tNDAuY2xlcmsuYWNjb3VudHMuZGV2JA";
+
 // Create a fallback component to show when Clerk key is missing
 const ClerkKeyMissing = () => {
   const { toast } = useToast();
@@ -57,7 +61,9 @@ const App = () => {
       return;
     }
     
-    console.warn("No Clerk key found in environment variables");
+    console.warn("No Clerk key found in environment variables, using fallback key");
+    // Use fallback key for development
+    setClerkPubKey(FALLBACK_CLERK_KEY);
   }, []);
 
   // If no Clerk key is available, show the error page
