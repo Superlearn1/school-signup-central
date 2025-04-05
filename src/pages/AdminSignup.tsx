@@ -19,7 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertCircle, School as SchoolIcon, LucideMailCheck, CreditCard, Users, Search } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import StepIndicator from '@/components/StepIndicator';
 
 const AdminSignup: React.FC = () => {
@@ -230,7 +230,7 @@ const AdminSignup: React.FC = () => {
           
           console.log("Creating Clerk organization for school:", selectedSchool.name);
           
-          // Create the Clerk organization - Fixed Error 1: Removed publicMetadata
+          // Create the Clerk organization
           const clerkOrganization = await clerk.createOrganization({
             name: selectedSchool.name
           });
@@ -241,11 +241,40 @@ const AdminSignup: React.FC = () => {
           
           console.log("Clerk organization created with ID:", clerkOrganization.id);
           
-          // Add the user to the organization with admin role
-          await clerkOrganization.addMember({
-            userId: result.createdUserId,
-            role: "admin"
-          });
+          // Add a delay to ensure the organization is fully created before adding a member
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Get the available organization roles for debugging
+          try {
+            const roles = await clerk.organization.getRoles();
+            console.log("Available organization roles:", roles);
+          } catch (rolesError) {
+            console.error("Failed to get organization roles:", rolesError);
+            // Continue with the flow, as this is just for debugging
+          }
+          
+          // Try to add the user with 'admin' role first, if it fails try 'org:admin'
+          try {
+            console.log("Attempting to add member with role 'admin'");
+            await clerkOrganization.addMember({
+              userId: result.createdUserId,
+              role: "admin"
+            });
+          } catch (adminRoleError) {
+            console.error("Failed to add member with 'admin' role:", adminRoleError);
+            
+            // Try with 'org:admin' as fallback
+            try {
+              console.log("Attempting to add member with role 'org:admin'");
+              await clerkOrganization.addMember({
+                userId: result.createdUserId,
+                role: "org:admin"
+              });
+            } catch (orgAdminRoleError) {
+              console.error("Failed with 'org:admin' role as well:", orgAdminRoleError);
+              throw new Error(`Failed to add member to organization: ${orgAdminRoleError.message}`);
+            }
+          }
           
           // Set this organization as active for the current user
           await clerk.setActive({ organization: clerkOrganization.id });

@@ -65,6 +65,7 @@ const App = () => {
     // This is a temporary solution to get the app working for demonstration
     console.log("Using fallback Clerk key for development");
     setClerkPubKey(TEMP_CLERK_KEY);
+    console.log("Clerk key being used:", TEMP_CLERK_KEY);
     
     // Log warning about using temporary key
     console.warn("Using temporary Clerk key for development. In production, secure your API keys properly.");
@@ -76,7 +77,19 @@ const App = () => {
   }
 
   return (
-    <ClerkProvider publishableKey={clerkPubKey}>
+    <ClerkProvider 
+      publishableKey={clerkPubKey}
+      // Add explicit settings for Clerk including organization settings
+      appearance={{
+        elements: {
+          organizationSwitcherTrigger: "py-2 px-4"
+        },
+      }}
+      // Ensure organization features are properly activated
+      organizationFeatures={{
+        enabled: true
+      }}
+    >
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <Toaster />
