@@ -77,7 +77,7 @@ const Dashboard: React.FC = () => {
               // Count members with teacher role
               const teacherMembers = members.data.filter(
                 member => member.role === 'org:teacher' || 
-                          (member.pending && member.publicMetadata.role === 'teacher')
+                          member.pending && member.publicMetadata.role === 'teacher'
               );
               setTeacherCount(teacherMembers.length);
             } catch (err) {
@@ -105,7 +105,7 @@ const Dashboard: React.FC = () => {
       organization.getMemberships().then(result => {
         const teacherMembers = result.data.filter(
           member => member.role === 'org:teacher' || 
-                    (member.pending && member.publicMetadata.role === 'teacher')
+                    member.pending && member.publicMetadata.role === 'teacher'
         );
         setTeacherCount(teacherMembers.length);
       }).catch(err => {
@@ -160,7 +160,7 @@ const Dashboard: React.FC = () => {
               </div>
               <p className="text-sm text-muted-foreground">
                 {teacherCount === 0 ? 
-                  "Invite teachers to join your school's platform" : 
+                  'Invite teachers to join your school's platform' : 
                   `You have ${subscription?.total_teacher_seats ?? 0} teacher seats in your plan`
                 }
               </p>
@@ -251,7 +251,7 @@ const Dashboard: React.FC = () => {
                 <p className="text-sm text-muted-foreground">
                   {teacherCount > 0 
                     ? `You've invited ${teacherCount} teacher${teacherCount !== 1 ? 's' : ''} to your school`
-                    : "Invite faculty members to join your school's platform"}
+                    : 'Invite faculty members to join your school's platform'}
                 </p>
                 {teacherCount === 0 && (
                   <Button className="mt-2" variant="outline" size="sm" onClick={handleInviteTeacher}>
