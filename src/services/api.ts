@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { School, Organization, Profile, Subscription, Student, Resource, ResourceAdaptation, NCCDEvidence } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -46,41 +47,84 @@ export const claimSchool = async (schoolId: string, clerkUserId: string): Promis
 export const updateSchoolWithClerkOrgId = async (schoolId: string, clerkOrgId: string): Promise<void> => {
   console.log(`Updating school ${schoolId} with Clerk organization ID ${clerkOrgId}`);
   
-  // Using a transaction to ensure data consistency
-  const { error } = await supabase.rpc('update_school_and_org', {
-    p_school_id: schoolId,
-    p_clerk_org_id: clerkOrgId
-  });
-
-  if (error) {
-    console.error('Error updating school with Clerk organization ID:', error);
-    
-    // Fallback to individual updates if the RPC fails
+  try {
+    // First update the school record
     const { error: schoolError } = await supabase
       .from('schools')
       .update({ clerk_org_id: clerkOrgId })
       .eq('id', schoolId);
     
     if (schoolError) {
+      console.error('Error updating school with Clerk organization ID:', schoolError);
       throw schoolError;
     }
     
-    // Also update the organization record if exists
-    const { error: orgError } = await supabase
-      .from('organizations')
-      .update({ clerk_org_id: clerkOrgId })
-      .eq('school_id', schoolId);
+    console.log('School record updated successfully with Clerk org ID');
     
-    if (orgError) {
-      console.error('Warning: Could not update organization table:', orgError);
-      // Don't throw, as the school update succeeded
+    // Then check if an organization record already exists
+    const { data: existingOrg } = await supabase
+      .from('organizations')
+      .select('id')
+      .eq('school_id', schoolId)
+      .maybeSingle();
+    
+    // If organization exists, update it
+    if (existingOrg) {
+      console.log('Found existing organization record, updating with Clerk org ID');
+      const { error: orgError } = await supabase
+        .from('organizations')
+        .update({ clerk_org_id: clerkOrgId })
+        .eq('school_id', schoolId);
+      
+      if (orgError) {
+        console.error('Error updating organization with Clerk org ID:', orgError);
+        // Don't throw here since the school update succeeded
+      } else {
+        console.log('Organization record updated successfully with Clerk org ID');
+      }
+    } else {
+      console.log('No existing organization record found for this school');
     }
+  } catch (error) {
+    console.error('Failed to update school or organization with Clerk org ID:', error);
+    throw error;
   }
 };
 
 export const createOrganization = async (schoolId: string, adminId: string, schoolName: string, clerkOrgId?: string): Promise<Organization> => {
   console.log(`Creating organization for school ${schoolId} with admin ${adminId} and Clerk org ID ${clerkOrgId || 'none'}`);
   
+  // Check if organization already exists
+  const { data: existingOrg } = await supabase
+    .from('organizations')
+    .select('*')
+    .eq('school_id', schoolId)
+    .maybeSingle();
+  
+  if (existingOrg) {
+    console.log('Organization already exists, updating instead of creating');
+    const { data, error } = await supabase
+      .from('organizations')
+      .update({ 
+        admin_id: adminId,
+        name: schoolName,
+        clerk_org_id: clerkOrgId,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', existingOrg.id)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error updating existing organization:', error);
+      throw error;
+    }
+    
+    console.log('Organization updated successfully');
+    return data as Organization;
+  }
+  
+  // Create new organization if it doesn't exist
   const { data, error } = await supabase
     .from('organizations')
     .insert([
@@ -110,6 +154,38 @@ export const createOrganization = async (schoolId: string, adminId: string, scho
 };
 
 export const createProfile = async (userId: string, schoolId: string, role: string, fullName?: string): Promise<Profile> => {
+  console.log(`Creating profile for user ${userId} in school ${schoolId} with role ${role}`);
+  
+  // Check if profile already exists
+  const { data: existingProfile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
+  
+  if (existingProfile) {
+    console.log('Profile already exists, updating instead of creating');
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({
+        school_id: schoolId,
+        role: role,
+        full_name: fullName,
+        clerk_user_id: userId
+      })
+      .eq('id', userId)
+      .select();
+    
+    if (error) {
+      console.error('Error updating existing profile:', error);
+      throw error;
+    }
+    
+    console.log('Profile updated successfully');
+    return data[0] as Profile;
+  }
+  
+  // Create new profile if it doesn't exist
   const { data, error } = await supabase
     .from('profiles')
     .insert([
@@ -132,10 +208,26 @@ export const createProfile = async (userId: string, schoolId: string, role: stri
     throw new Error('Failed to create profile');
   }
 
+  console.log('Profile created successfully');
   return data[0] as Profile;
 };
 
 export const initializeSubscription = async (schoolId: string): Promise<Subscription> => {
+  console.log(`Initializing subscription for school ${schoolId}`);
+  
+  // Check if subscription already exists
+  const { data: existingSubscription } = await supabase
+    .from('subscriptions')
+    .select('*')
+    .eq('school_id', schoolId)
+    .maybeSingle();
+  
+  if (existingSubscription) {
+    console.log('Subscription already exists, not creating a new one');
+    return existingSubscription as Subscription;
+  }
+  
+  // Create new subscription if it doesn't exist
   const { data, error } = await supabase
     .from('subscriptions')
     .insert([
@@ -159,6 +251,7 @@ export const initializeSubscription = async (schoolId: string): Promise<Subscrip
     throw new Error('Failed to initialize subscription');
   }
 
+  console.log('Subscription initialized successfully');
   return data[0] as Subscription;
 };
 

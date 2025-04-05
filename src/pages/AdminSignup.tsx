@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSignUp, useClerk } from '@clerk/clerk-react';
@@ -181,6 +182,8 @@ const AdminSignup: React.FC = () => {
       await signUp.create({
         emailAddress: formData.email,
         password: formData.password,
+        username: formData.username,
+        firstName: formData.username,
       });
 
       await signUp.prepareEmailAddressVerification({
@@ -225,14 +228,18 @@ const AdminSignup: React.FC = () => {
       
       if (selectedSchool && result.createdUserId) {
         try {
+          console.log("Starting school setup with userId:", result.createdUserId);
+          
           // First, claim the school
           await claimSchool(formData.schoolId!, result.createdUserId);
           
-          console.log("Creating Clerk organization for school:", selectedSchool.name);
+          console.log("School claimed successfully, creating Clerk organization for school:", selectedSchool.name);
           
           // Create the Clerk organization
           const clerkOrganization = await clerk.createOrganization({
-            name: selectedSchool.name
+            name: selectedSchool.name,
+            // Adding slug for better URLs
+            slug: selectedSchool.name.toLowerCase().replace(/\s+/g, '-')
           });
           
           if (!clerkOrganization || !clerkOrganization.id) {
@@ -242,7 +249,7 @@ const AdminSignup: React.FC = () => {
           console.log("Clerk organization created with ID:", clerkOrganization.id);
           
           // Add a delay to ensure the organization is fully created before adding a member
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 1500));
           
           // Get the available organization roles for debugging
           try {
@@ -253,13 +260,14 @@ const AdminSignup: React.FC = () => {
             // Continue with the flow, as this is just for debugging
           }
           
-          // Try to add the user with 'admin' role first, if it fails try 'org:admin'
+          // Try to add the user with 'admin' role first
           try {
             console.log("Attempting to add member with role 'admin'");
             await clerkOrganization.addMember({
               userId: result.createdUserId,
               role: "admin"
             });
+            console.log("Successfully added user as admin to organization");
           } catch (adminRoleError) {
             console.error("Failed to add member with 'admin' role:", adminRoleError);
             
@@ -270,6 +278,7 @@ const AdminSignup: React.FC = () => {
                 userId: result.createdUserId,
                 role: "org:admin"
               });
+              console.log("Successfully added user as org:admin to organization");
             } catch (orgAdminRoleError) {
               console.error("Failed with 'org:admin' role as well:", orgAdminRoleError);
               throw new Error(`Failed to add member to organization: ${orgAdminRoleError.message}`);
@@ -278,8 +287,14 @@ const AdminSignup: React.FC = () => {
           
           // Set this organization as active for the current user
           await clerk.setActive({ organization: clerkOrganization.id });
+          console.log("Set organization as active for user");
+          
+          // Update the school record with the clerk_org_id first
+          console.log("Updating school with Clerk org ID");
+          await updateSchoolWithClerkOrgId(formData.schoolId!, clerkOrganization.id);
           
           // Create organization record in database
+          console.log("Creating organization record in Supabase");
           const organization = await createOrganization(
             formData.schoolId!, 
             result.createdUserId, 
@@ -287,10 +302,8 @@ const AdminSignup: React.FC = () => {
             clerkOrganization.id
           );
           
-          // Update the school record with the clerk_org_id
-          await updateSchoolWithClerkOrgId(formData.schoolId!, clerkOrganization.id);
-          
           // Create the admin profile
+          console.log("Creating admin profile in Supabase");
           await createProfile(
             result.createdUserId,
             formData.schoolId!,
@@ -299,12 +312,15 @@ const AdminSignup: React.FC = () => {
           );
           
           // Initialize subscription
+          console.log("Initializing subscription record");
           await initializeSubscription(formData.schoolId!);
           
           toast({
             title: 'School setup completed',
             description: 'You are now the administrator for this school.',
           });
+          
+          console.log("Signup and onboarding completed successfully");
         } catch (error: any) {
           console.error('Failed to set up school:', error);
           toast({
