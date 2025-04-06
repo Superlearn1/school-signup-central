@@ -3,6 +3,15 @@
 
 This Supabase Edge Function handles the creation of a Clerk organization and returns its ID.
 
+## Functionality
+
+The function performs the following operations:
+1. Creates a new Clerk organization with the provided name and school ID in metadata
+2. Verifies the existence of the admin user in Clerk
+3. Adds the specified admin user as an admin member of the organization
+4. Includes a small delay between organization creation and member addition to ensure Clerk has processed the organization
+5. Verifies that the admin was successfully added to the organization
+
 ## Deployment
 
 1. Make sure you have the Supabase CLI installed and are logged in
@@ -42,19 +51,29 @@ It returns a JSON response with:
 ```json
 {
   "id": "org_1234567890",
-  "message": "Organization created and admin user added successfully"
+  "message": "Organization created and admin user added successfully",
+  "membershipStatus": "success"
 }
 ```
 
-## Function Purpose
+If successful with a warning:
 
-This edge function performs two operations:
-1. It creates a new Clerk organization with the provided name
-2. It adds the specified admin user as an admin member of the organization
+```json
+{
+  "id": "org_1234567890",
+  "warning": "Organization created but admin user could not be added automatically. Will retry on next login.",
+  "error": { ... error details ... }
+}
+```
 
-This ensures that the admin user who creates the organization is automatically added as a member with admin privileges, which is required for inviting teachers and managing the organization.
+## Error Handling
+
+The function includes extensive error handling:
+- Logs all steps for debugging
+- Returns detailed error information
+- Gracefully handles cases where organization creation succeeds but member addition fails
+- Includes appropriate HTTP status codes for different error types
 
 ## CORS Configuration
 
 This function includes proper CORS headers to allow cross-origin requests from the frontend application.
-

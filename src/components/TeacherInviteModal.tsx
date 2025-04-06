@@ -19,25 +19,29 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isFixingOrganization, setIsFixingOrganization] = useState(false);
-  const { organization } = useOrganization();
+  const [verificationAttempts, setVerificationAttempts] = useState(0);
+  const { organization, isLoaded: orgIsLoaded } = useOrganization();
   const { user } = useUser();
   const { toast } = useToast();
 
   // Check and fix organization membership when modal opens
   useEffect(() => {
-    if (isOpen && organization?.id) {
+    if (isOpen && organization?.id && verificationAttempts < 3) {
       verifyOrganizationSetup();
     }
-  }, [isOpen, organization?.id]);
+  }, [isOpen, organization?.id, verificationAttempts]);
 
   const verifyOrganizationSetup = async () => {
     if (!organization?.id || !user) return;
     
     try {
       setIsFixingOrganization(true);
+      console.log('Verifying organization setup...');
       
       // Check if current user is a member of the organization
       const members = await organization.getMemberships();
+      console.log('Current organization members:', members);
+      
       const currentUserIsMember = members.data.some(
         member => member.publicUserData.userId === user.id
       );
@@ -45,23 +49,56 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
       if (!currentUserIsMember) {
         // Try to fix the membership via our edge function
         console.log("Current user is not a member of the organization. Attempting to fix...");
-        await checkAndFixOrganizationAdmin(organization.id);
+        const fixed = await checkAndFixOrganizationAdmin(organization.id);
         
-        // Refresh the organization data
-        await organization.reload();
-        
-        toast({
-          title: 'Organization membership verified',
-          description: 'Your administrator access has been confirmed.',
-        });
+        if (fixed) {
+          console.log("Successfully fixed organization membership");
+          
+          // Refresh the organization data
+          await organization.reload();
+          
+          toast({
+            title: 'Organization membership verified',
+            description: 'Your administrator access has been confirmed.',
+          });
+        } else {
+          console.error("Failed to fix organization membership");
+          setVerificationAttempts(prev => prev + 1);
+          
+          if (verificationAttempts >= 2) {
+            toast({
+              title: 'Organization setup issue',
+              description: 'There was a problem verifying your organization access. Please try refreshing the page.',
+              variant: 'destructive',
+            });
+          } else {
+            // Retry after a short delay
+            setTimeout(() => {
+              verifyOrganizationSetup();
+            }, 2000);
+          }
+        }
+      } else {
+        console.log("User is already a member of the organization");
+        // Even if they're a member, verify they have admin role
+        const memberInfo = members.data.find(member => member.publicUserData.userId === user.id);
+        if (memberInfo && memberInfo.role !== 'admin') {
+          console.log("User is a member but not an admin. Attempting to fix...");
+          await checkAndFixOrganizationAdmin(organization.id);
+          await organization.reload();
+        }
       }
     } catch (error) {
-      console.error("Failed to fix organization membership:", error);
-      toast({
-        title: 'Organization setup issue',
-        description: 'There was a problem verifying your organization access. Please refresh and try again.',
-        variant: 'destructive',
-      });
+      console.error("Failed to verify organization membership:", error);
+      setVerificationAttempts(prev => prev + 1);
+      
+      if (verificationAttempts >= 2) {
+        toast({
+          title: 'Organization setup issue',
+          description: 'There was a problem verifying your organization access. Please refresh and try again.',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setIsFixingOrganization(false);
     }
@@ -112,11 +149,30 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
       // Verify organization membership again just to be sure
       await verifyOrganizationSetup();
 
+      // Double-check that we have the membership info and current user is an admin
+      const members = await organization.getMemberships();
+      const currentUserIsMember = members.data.some(
+        member => member.publicUserData.userId === user?.id && member.role === 'admin'
+      );
+      
+      if (!currentUserIsMember) {
+        console.error("User is still not an admin of the organization after verification");
+        toast({
+          title: 'Organization access issue',
+          description: 'You do not have admin permissions for this organization. Please refresh and try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      console.log("Sending invitation to:", email);
       // Send invitation via Clerk - using the correct API method
       const invitation = await organization.inviteMember({
         emailAddress: email,
         role: 'org:teacher',
       });
+      
+      console.log("Invitation sent successfully:", invitation);
 
       // Update used_teacher_seats in Supabase
       // Note: Optimistically increment the count; Clerk webhook will validate later
@@ -151,6 +207,22 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
       setIsLoading(false);
     }
   };
+
+  // If organization isn't loaded yet, show a loading indicator
+  if (!orgIsLoaded) {
+    return (
+      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Invite Teacher</DialogTitle>
+            <DialogDescription>
+              Loading organization information...
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>

@@ -28,6 +28,12 @@ export const createClerkOrganization = async (name: string, schoolId: string, ad
 
     if (data.warning) {
       console.warn('Warning while creating organization:', data.warning);
+      
+      // If there was a warning about adding the admin, try to fix it
+      if (data.id) {
+        console.log('Attempting to fix admin membership issue...');
+        await checkAndFixOrganizationAdmin(data.id);
+      }
     }
 
     console.log('Successfully created Clerk organization with ID:', data.id);
@@ -39,12 +45,14 @@ export const createClerkOrganization = async (name: string, schoolId: string, ad
 };
 
 /**
- * Updates the TeacherInviteModal to check and fix admin membership
+ * Verifies and fixes admin membership in a Clerk organization
  * @param organizationId The ID of the Clerk organization
  * @returns Success status
  */
 export const checkAndFixOrganizationAdmin = async (organizationId: string): Promise<boolean> => {
   try {
+    console.log(`Attempting to verify admin membership for organization: ${organizationId}`);
+    
     const { data, error } = await supabase.functions.invoke('verify-admin-membership', {
       body: { organizationId },
     });
@@ -54,7 +62,23 @@ export const checkAndFixOrganizationAdmin = async (organizationId: string): Prom
       return false;
     }
 
-    return data?.success || false;
+    if (!data || !data.success) {
+      console.error('Failed to verify admin membership:', data);
+      return false;
+    }
+
+    console.log('Admin membership verification result:', data);
+    
+    // Log what happened during the verification
+    if (data.alreadyMember && data.isAdmin) {
+      console.log('User is already an admin of this organization');
+    } else if (data.wasPromoted) {
+      console.log('User was successfully promoted to admin role');
+    } else if (data.wasAdded) {
+      console.log('User was successfully added as admin to the organization');
+    }
+
+    return data.success;
   } catch (error) {
     console.error('Failed to verify admin membership:', error);
     return false;

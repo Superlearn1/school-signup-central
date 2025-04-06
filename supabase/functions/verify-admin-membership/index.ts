@@ -25,130 +25,203 @@ serve(async (req) => {
   }
 
   try {
-    // Only allow POST requests
+    // Ensure we have a POST request
     if (req.method !== "POST") {
-      return new Response(JSON.stringify({ success: false, error: "Method not allowed" }), {
+      console.error("Method not allowed:", req.method);
+      return new Response(JSON.stringify({ error: "Method not allowed" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 405,
       });
     }
 
-    // Get authorization header to identify the user
+    // Extract the JWT token from the authorization header
     const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ success: false, error: "Missing authorization header" }), {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      console.error("Missing or invalid authorization header");
+      return new Response(JSON.stringify({ error: "Missing or invalid authorization header" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 401,
       });
     }
 
-    // Get the Clerk token from the authorization header
-    const token = authHeader.replace("Bearer ", "");
+    const jwt = authHeader.substring(7);
 
-    // Get the request body
-    const body: RequestBody = await req.json();
-
-    // Validate the request body
-    if (!body.organizationId) {
-      return new Response(JSON.stringify({ success: false, error: "Missing required field: organizationId" }), {
+    // Get request body
+    const { organizationId } = await req.json() as RequestBody;
+    if (!organizationId) {
+      console.error("Missing organizationId in request body");
+      return new Response(JSON.stringify({ error: "Missing organizationId in request body" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
       });
     }
 
-    // Get the Clerk secret key from environment variables
+    console.log("Verifying admin membership for organization:", organizationId);
+
+    // Get Clerk secret key
     const clerkSecretKey = Deno.env.get("CLERK_SECRET_KEY");
     if (!clerkSecretKey) {
-      return new Response(JSON.stringify({ success: false, error: "Server configuration error: CLERK_SECRET_KEY not set" }), {
+      console.error("CLERK_SECRET_KEY not set");
+      return new Response(JSON.stringify({ error: "Server configuration error: CLERK_SECRET_KEY not set" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
       });
     }
 
-    // Get the user's ID from the token
-    const userResponse = await fetch("https://api.clerk.dev/v1/me", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!userResponse.ok) {
-      return new Response(JSON.stringify({ success: false, error: "Invalid user token" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 401,
-      });
-    }
-
-    const userData = await userResponse.json();
-    const userId = userData.id;
-
-    console.log(`Verifying membership for user ${userId} in organization ${body.organizationId}`);
-
-    // Get the organization's memberships
-    const membershipsResponse = await fetch(`https://api.clerk.dev/v1/organizations/${body.organizationId}/memberships`, {
-      headers: {
-        Authorization: `Bearer ${clerkSecretKey}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!membershipsResponse.ok) {
-      const errorData = await membershipsResponse.json();
-      console.error("Failed to get organization memberships:", errorData);
-      return new Response(JSON.stringify({ success: false, error: "Failed to verify organization membership" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
-      });
-    }
-
-    const memberships = await membershipsResponse.json();
-    
-    // Check if the user is already a member
-    const isUserMember = memberships.some((membership: any) => membership.public_user_data.user_id === userId);
-    
-    if (isUserMember) {
-      console.log(`User ${userId} is already a member of organization ${body.organizationId}`);
-      return new Response(JSON.stringify({ success: true, message: "User is already a member of the organization" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
-    }
-
-    console.log(`User ${userId} is not a member of organization ${body.organizationId}. Adding now...`);
-
-    // Add the user as an admin to the organization
-    const addResponse = await fetch(`https://api.clerk.dev/v1/organizations/${body.organizationId}/memberships`, {
+    // Verify the JWT token and get user info from Clerk
+    const tokenVerificationResponse = await fetch("https://api.clerk.dev/v1/sessions/verify", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${clerkSecretKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        user_id: userId,
-        role: "admin",
+        token: jwt,
       }),
     });
 
-    if (!addResponse.ok) {
-      const errorData = await addResponse.json();
-      console.error("Failed to add user to organization:", errorData);
-      return new Response(JSON.stringify({ success: false, error: "Failed to add user to organization" }), {
+    if (!tokenVerificationResponse.ok) {
+      const errorData = await tokenVerificationResponse.json();
+      console.error("Token verification failed:", errorData);
+      return new Response(JSON.stringify({ error: "Invalid authentication token", details: errorData }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
+        status: 401,
       });
     }
 
-    const addData = await addResponse.json();
-    console.log(`User ${userId} successfully added to organization ${body.organizationId} as admin`);
-    
-    return new Response(JSON.stringify({ success: true, message: "User added to organization as admin", data: addData }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
+    const sessionData = await tokenVerificationResponse.json();
+    const userId = sessionData.client_session.user_id;
+    console.log("User ID from verified token:", userId);
+
+    // Check if user is already a member of the organization
+    const membershipResponse = await fetch(`https://api.clerk.dev/v1/organizations/${organizationId}/memberships`, {
+      headers: {
+        Authorization: `Bearer ${clerkSecretKey}`,
+        "Content-Type": "application/json",
+      },
     });
+
+    if (!membershipResponse.ok) {
+      const errorData = await membershipResponse.json();
+      console.error("Failed to get organization memberships:", errorData);
+      return new Response(JSON.stringify({ 
+        error: "Failed to get organization memberships", 
+        details: errorData 
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: membershipResponse.status,
+      });
+    }
+
+    const memberships = await membershipResponse.json();
+    console.log("Organization memberships:", memberships);
+
+    // Check if current user is already a member
+    const isUserMember = memberships.data.some(member => member.public_user_data.user_id === userId);
+    console.log("Is user already a member:", isUserMember);
+
+    if (isUserMember) {
+      // User is already a member, check if they're an admin
+      const userMembership = memberships.data.find(member => member.public_user_data.user_id === userId);
+      const isAdmin = userMembership.role === "admin";
+      console.log("Is user an admin:", isAdmin);
+
+      if (isAdmin) {
+        return new Response(JSON.stringify({ 
+          success: true, 
+          message: "User is already an admin of this organization",
+          alreadyMember: true,
+          isAdmin: true
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      } else {
+        // User is a member but not an admin, promote them
+        console.log("Promoting user to admin role");
+        const promotionResponse = await fetch(`https://api.clerk.dev/v1/organizations/${organizationId}/memberships/${userMembership.id}`, {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${clerkSecretKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            role: "admin",
+          }),
+        });
+
+        if (!promotionResponse.ok) {
+          const errorData = await promotionResponse.json();
+          console.error("Failed to promote user to admin:", errorData);
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: "Failed to promote user to admin", 
+            details: errorData 
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200, // Return 200 even if promotion fails
+          });
+        }
+
+        return new Response(JSON.stringify({ 
+          success: true, 
+          message: "User promoted to admin role",
+          alreadyMember: true,
+          isAdmin: true,
+          wasPromoted: true
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
+    } else {
+      // User is not a member, add them with admin role
+      console.log(`Adding user ${userId} to organization ${organizationId} as admin`);
+      const addMembershipResponse = await fetch(`https://api.clerk.dev/v1/organizations/${organizationId}/memberships`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${clerkSecretKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          role: "admin",
+        }),
+      });
+
+      if (!addMembershipResponse.ok) {
+        const errorData = await addMembershipResponse.json();
+        console.error("Failed to add user to organization:", errorData);
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: "Failed to add user to organization", 
+          details: errorData 
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200, // Return 200 even if adding fails
+        });
+      }
+
+      const membershipData = await addMembershipResponse.json();
+      console.log("User added to organization:", membershipData);
+
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: "User added to organization as admin",
+        alreadyMember: false,
+        isAdmin: true,
+        wasAdded: true
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
   } catch (error) {
-    console.error("Error:", error.message);
-    return new Response(JSON.stringify({ success: false, error: `Server error: ${error.message}` }), {
+    console.error("Unhandled error:", error.message, error.stack);
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: `Server error: ${error.message}` 
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });

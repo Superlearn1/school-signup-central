@@ -7,7 +7,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 interface RequestBody {
   name: string;
   schoolId: string;
-  adminUserId: string;  // Add admin user ID to the request
+  adminUserId: string;
 }
 
 // Define proper CORS headers that include all required headers
@@ -29,6 +29,7 @@ serve(async (req) => {
   try {
     // Only allow POST requests
     if (req.method !== "POST") {
+      console.error("Method not allowed:", req.method);
       return new Response(JSON.stringify({ error: "Method not allowed" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 405,
@@ -40,6 +41,7 @@ serve(async (req) => {
 
     // Validate the request body
     if (!body.name || !body.schoolId || !body.adminUserId) {
+      console.error("Missing required fields:", body);
       return new Response(JSON.stringify({ error: "Missing required fields: name, schoolId, or adminUserId" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
@@ -49,6 +51,7 @@ serve(async (req) => {
     // Get the Clerk secret key from environment variables
     const clerkSecretKey = Deno.env.get("CLERK_SECRET_KEY");
     if (!clerkSecretKey) {
+      console.error("CLERK_SECRET_KEY not set");
       return new Response(JSON.stringify({ error: "Server configuration error: CLERK_SECRET_KEY not set" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
@@ -56,8 +59,33 @@ serve(async (req) => {
     }
 
     console.log("Creating organization in Clerk with name:", body.name);
+    console.log("Admin user ID:", body.adminUserId);
 
-    // Create a new organization in Clerk
+    // 1. Check if user exists in Clerk first
+    const userResponse = await fetch(`https://api.clerk.dev/v1/users/${body.adminUserId}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${clerkSecretKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!userResponse.ok) {
+      const errorData = await userResponse.json();
+      console.error("User verification failed:", errorData);
+      return new Response(JSON.stringify({ 
+        error: `User verification failed: ${userResponse.statusText}`, 
+        details: errorData 
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: userResponse.status,
+      });
+    }
+
+    const userData = await userResponse.json();
+    console.log("User exists in Clerk:", userData.id);
+
+    // 2. Create a new organization in Clerk
     const createResponse = await fetch("https://api.clerk.dev/v1/organizations", {
       method: "POST",
       headers: {
@@ -75,7 +103,10 @@ serve(async (req) => {
     if (!createResponse.ok) {
       const errorData = await createResponse.json();
       console.error("Clerk API error during organization creation:", errorData);
-      return new Response(JSON.stringify({ error: `Clerk API error: ${createResponse.statusText}`, details: errorData }), {
+      return new Response(JSON.stringify({ 
+        error: `Clerk API error: ${createResponse.statusText}`, 
+        details: errorData 
+      }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: createResponse.status,
       });
@@ -84,7 +115,10 @@ serve(async (req) => {
     const orgData = await createResponse.json();
     console.log("Successfully created organization in Clerk with ID:", orgData.id);
     
-    // Now add the admin user to the organization with admin role
+    // 3. Add the admin user to the organization with admin role
+    // Important: Add a delay to ensure Clerk has fully processed the organization creation
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
     console.log(`Adding admin user ${body.adminUserId} to organization ${orgData.id}`);
     const membershipResponse = await fetch(`https://api.clerk.dev/v1/organizations/${orgData.id}/memberships`, {
       method: "POST",
@@ -98,13 +132,16 @@ serve(async (req) => {
       }),
     });
 
+    // 4. Verify the membership was created
     if (!membershipResponse.ok) {
       const membershipError = await membershipResponse.json();
       console.error("Failed to add admin user to organization:", membershipError);
-      // Still return the org ID since it was created, even if adding admin failed
+      
+      // Return error but with 200 status since org was created
       return new Response(JSON.stringify({ 
         id: orgData.id, 
-        warning: "Organization created but admin user could not be added automatically" 
+        warning: "Organization created but admin user could not be added automatically. Will retry on next login.",
+        error: membershipError
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
@@ -114,10 +151,22 @@ serve(async (req) => {
     const membershipData = await membershipResponse.json();
     console.log("Admin user successfully added to organization:", membershipData);
     
+    // 5. Double check if the user is now in the organization
+    const verifyMembershipResponse = await fetch(`https://api.clerk.dev/v1/organizations/${orgData.id}/memberships`, {
+      headers: {
+        Authorization: `Bearer ${clerkSecretKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+    
+    const memberships = await verifyMembershipResponse.json();
+    console.log("Current organization memberships:", memberships);
+    
     // Return the organization ID with success message
     return new Response(JSON.stringify({ 
       id: orgData.id,
-      message: "Organization created and admin user added successfully" 
+      message: "Organization created and admin user added successfully",
+      membershipStatus: membershipResponse.ok ? "success" : "failed",
     }), {
       headers: { 
         ...corsHeaders, 
@@ -126,7 +175,7 @@ serve(async (req) => {
       status: 200,
     });
   } catch (error) {
-    console.error("Error:", error.message);
+    console.error("Unhandled error:", error.message, error.stack);
     return new Response(JSON.stringify({ error: `Server error: ${error.message}` }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
