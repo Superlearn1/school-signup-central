@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useUser, useOrganization } from '@clerk/clerk-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
+import { createClerkOrganization } from '@/services/organization';
 
 const RecoveryTool: React.FC = () => {
   const { user } = useUser();
@@ -55,24 +55,11 @@ const RecoveryTool: React.FC = () => {
 
     setLoading(true);
     try {
-      // Create a new Clerk organization
-      const response = await fetch('/api/create-organization', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: school.name,
-          schoolId: school.id,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create organization');
-      }
-
-      const data = await response.json();
-      const clerkOrgId = data.id;
+      // Create a new Clerk organization using our service
+      const clerkOrgId = await createClerkOrganization(
+        school.name,
+        school.id
+      );
 
       // Update the school record with the new Clerk org ID
       const { error: updateError } = await supabase
