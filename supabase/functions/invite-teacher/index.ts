@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -50,7 +51,7 @@ serve(async (req) => {
       emailAddress,
       schoolId,
       hasClerkKey: !!clerkSecretKey,
-      clerkKeyPrefix: clerkSecretKey ? clerkSecretKey.substring(0, 7) : null
+      clerkKeyPrefix: clerkSecretKey ? clerkSecretKey.substring(0, 7) + "..." : null
     });
 
     // Input validation
@@ -68,38 +69,88 @@ serve(async (req) => {
       );
     }
 
-    // Verify the organization exists
-    try {
-      debugLog(`Verifying organization exists [${requestId}]: ${organizationId}`);
-      const organization = await clerk.organizations.getOrganization({
-        organizationId
-      });
-      debugLog(`Organization verified [${requestId}]: ${organization.name}`, {
-        id: organization.id,
-        name: organization.name,
-        slug: organization.slug,
-        privateMetadataKeys: Object.keys(organization.privateMetadata || {}),
-        publicMetadataKeys: Object.keys(organization.publicMetadata || {}),
-        createdAt: organization.createdAt
-      });
-    } catch (orgError) {
-      errorLog(`Organization verification failed [${requestId}]`, orgError);
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          message: `Organization not found: ${orgError.message}`,
-          error: orgError,
-          requestId
-        }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
+    // Verify the organization exists with a retry mechanism
+    let organization = null;
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (!organization && retryCount < maxRetries) {
+      try {
+        debugLog(`Verifying organization exists [${requestId}] (attempt ${retryCount + 1}): ${organizationId}`);
+        organization = await clerk.organizations.getOrganization({
+          organizationId
+        });
+        
+        debugLog(`Organization verified [${requestId}]: ${organization.name}`, {
+          id: organization.id,
+          name: organization.name,
+          slug: organization.slug,
+          privateMetadataKeys: Object.keys(organization.privateMetadata || {}),
+          publicMetadataKeys: Object.keys(organization.publicMetadata || {}),
+          createdAt: organization.createdAt
+        });
+      } catch (orgError) {
+        retryCount++;
+        
+        if (retryCount >= maxRetries) {
+          errorLog(`Organization verification failed after ${maxRetries} attempts [${requestId}]`, orgError);
+          return new Response(
+            JSON.stringify({ 
+              success: false,
+              message: `Organization not found after ${maxRetries} attempts: ${orgError.message}`,
+              error: orgError,
+              requestId
+            }),
+            {
+              status: 404,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            }
+          );
         }
-      );
+        
+        // Add exponential backoff with jitter
+        const delay = Math.floor(500 * Math.pow(2, retryCount) * (0.9 + Math.random() * 0.2));
+        debugLog(`Retrying organization verification in ${delay}ms [${requestId}]`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+
+    // If we've verified the organization exists, check if it has the required metadata
+    if (organization) {
+      // Check if we have a schoolId in either privateMetadata or publicMetadata
+      const orgSchoolId = organization.privateMetadata?.schoolId || organization.publicMetadata?.schoolId;
+      
+      // If provided schoolId doesn't match the organization's schoolId, log a warning
+      if (schoolId && orgSchoolId && schoolId !== orgSchoolId) {
+        debugLog(`Warning: Provided schoolId (${schoolId}) doesn't match organization's schoolId (${orgSchoolId}) [${requestId}]`);
+      }
+      
+      // If organization doesn't have a schoolId, try to update it
+      if (!orgSchoolId && schoolId) {
+        try {
+          debugLog(`Organization missing schoolId, attempting to update [${requestId}]`);
+          
+          // Create a metadata update object that preserves existing metadata
+          const updatedPrivateMetadata = { 
+            ...organization.privateMetadata,
+            schoolId: schoolId
+          };
+          
+          await clerk.organizations.updateOrganization({
+            organizationId,
+            privateMetadata: updatedPrivateMetadata
+          });
+          
+          debugLog(`Successfully updated organization with schoolId [${requestId}]`);
+        } catch (updateError) {
+          errorLog(`Failed to update organization metadata [${requestId}]`, updateError);
+          // Continue with the invitation even if metadata update fails
+        }
+      }
     }
 
     // Try to send the invitation - try multiple role variations
-    const rolesToTry = ["member", "basic_member", "org:member", "admin", "org:admin", "org:teacher", ""];
+    const rolesToTry = ["member", "basic_member", "org:member", "admin", "org:admin", "org:teacher", "teacher", ""];
     let success = false;
     let invitation = null;
     let errorDetails = [];
@@ -214,4 +265,4 @@ serve(async (req) => {
       }
     );
   }
-}); 
+});

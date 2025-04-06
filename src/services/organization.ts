@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 /**
@@ -22,7 +23,9 @@ export const createClerkOrganization = async (name: string, schoolId: string, ad
         adminUserId, 
         requestId,
         // Explicitly request setting schoolId in both locations
-        setInBothMetadataLocations: true
+        setInBothMetadataLocations: true,
+        // Increase delay between org creation and member addition to 5000ms (5 seconds)
+        memberAdditionDelay: 5000
       },
     });
 
@@ -51,7 +54,7 @@ export const createClerkOrganization = async (name: string, schoolId: string, ad
       // Also schedule a delayed retry with exponential backoff
       // This helps overcome potential propagation delays in Clerk's systems
       const scheduleRetries = async () => {
-        const retryTimes = [2000, 5000, 15000];
+        const retryTimes = [3000, 7000, 15000, 30000]; // Increased delays
         
         for (let i = 0; i < retryTimes.length; i++) {
           await new Promise(resolve => setTimeout(resolve, retryTimes[i]));
@@ -82,7 +85,7 @@ export const createClerkOrganization = async (name: string, schoolId: string, ad
         } catch (fixError) {
           console.error('Failed to verify admin membership after delay:', fixError);
         }
-      }, 3000);
+      }, 5000); // Increased from 3000ms to 5000ms
     }
 
     // Log the user's membership status for debugging
@@ -95,7 +98,7 @@ export const createClerkOrganization = async (name: string, schoolId: string, ad
       } catch (checkError) {
         console.error('Failed to check membership status:', checkError);
       }
-    }, 8000);
+    }, 10000); // Increased from 8000ms to 10000ms
 
     console.log('Successfully created Clerk organization with ID:', data.id);
     return data.id;
@@ -212,7 +215,7 @@ export const verifyOrganizationAdminWithRetry = async (
   organizationId: string, 
   userId?: string,
   maxAttempts = 3,
-  initialBackoff = 1000
+  initialBackoff = 2000 // Increased from 1000ms to 2000ms
 ): Promise<boolean> => {
   let attempts = 0;
   let success = false;
@@ -326,7 +329,9 @@ export const createOrganization = async (name: string, slug: string, adminUserId
         name,
         slug,
         adminUserId,
-        requestId
+        requestId,
+        // Increase delay between org creation and member addition to 5000ms (5 seconds)
+        memberAdditionDelay: 5000
       })
     });
 
@@ -352,7 +357,7 @@ export const createOrganization = async (name: string, slug: string, adminUserId
       }
       
       // Schedule retries with exponential backoff
-      const retryDelays = [2000, 5000, 10000, 30000]; // 2s, 5s, 10s, 30s
+      const retryDelays = [3000, 7000, 15000, 30000]; // Increased delays
       retryDelays.forEach((delay, index) => {
         setTimeout(async () => {
           try {
