@@ -62,8 +62,9 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
         throw new Error('You have reached your teacher seat limit. Please upgrade your subscription to add more teachers.');
       }
 
-      // Send invitation via Clerk
-      const invitation = await organization.createMembershipInvitation({
+      // Send invitation via Clerk - using the correct API method for the Clerk version
+      // Instead of createMembershipInvitation, use inviteMember which is available in this version
+      const invitation = await organization.inviteMember({
         emailAddress: email,
         role: 'org:teacher',
         redirectUrl: window.location.origin + '/dashboard',

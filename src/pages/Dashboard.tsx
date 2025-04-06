@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useUser, useClerk, useOrganization } from '@clerk/clerk-react';
 import { Button } from '@/components/ui/button';
@@ -7,7 +6,6 @@ import { School, Users, UserPlus, Settings, LogOut, CreditCard, Check } from 'lu
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Subscription } from '@/types';
-// Fix the import path to use default export
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 import TeacherInviteModal from '@/components/TeacherInviteModal';
 
@@ -75,10 +73,10 @@ const Dashboard: React.FC = () => {
           if (organization) {
             try {
               const members = await organization.getMemberships();
-              // Count members with teacher role
+              // Count members with teacher role, safely checking for pending property
               const teacherMembers = members.data.filter(
                 member => member.role === 'org:teacher' || 
-                          member.pending && member.publicMetadata.role === 'teacher'
+                          (member as any).pending && (member as any).publicMetadata?.role === 'teacher'
               );
               setTeacherCount(teacherMembers.length);
             } catch (err) {
@@ -106,7 +104,7 @@ const Dashboard: React.FC = () => {
       organization.getMemberships().then(result => {
         const teacherMembers = result.data.filter(
           member => member.role === 'org:teacher' || 
-                    member.pending && member.publicMetadata.role === 'teacher'
+                    (member as any).pending && (member as any).publicMetadata?.role === 'teacher'
         );
         setTeacherCount(teacherMembers.length);
       }).catch(err => {
@@ -265,7 +263,6 @@ const Dashboard: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Teacher Invite Modal */}
       <TeacherInviteModal 
         isOpen={showInviteModal} 
         onClose={() => setShowInviteModal(false)} 
