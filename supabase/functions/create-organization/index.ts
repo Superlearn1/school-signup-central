@@ -1,263 +1,259 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { corsHeaders } from "../_shared/cors.ts";
 
-// Follow this setup guide to integrate the Deno runtime into your application:
-// https://deno.land/manual/examples/fetch_data
+// Load Clerk SDK
+import { Clerk } from "https://esm.sh/@clerk/backend@0.36.1";
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+// Log the environment
+console.log(`CLERK_SECRET_KEY present: ${!!Deno.env.get("CLERK_SECRET_KEY")}`);
+console.log(`Running in environment: ${Deno.env.get("SUPABASE_ENV") || "unknown"}`);
 
-interface RequestBody {
-  name: string;
-  schoolId: string;
-  adminUserId: string;
+// Initialize Clerk client with secret key from environment
+const clerkSecretKey = Deno.env.get("CLERK_SECRET_KEY");
+if (!clerkSecretKey) {
+  console.error("CLERK_SECRET_KEY environment variable is not set");
 }
+const clerk = Clerk({ secretKey: clerkSecretKey });
 
-// Define proper CORS headers that include all required headers
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+// Helper to validate userId format (basic check)
+const isValidUserId = (userId: string): boolean => {
+  return typeof userId === 'string' && userId.startsWith('user_');
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  // Enhanced logging
+  console.log(`Request received: ${req.method} ${new URL(req.url).pathname}`);
+  
+  // Handle CORS preflight request
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      headers: corsHeaders,
-      status: 204,
-    });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    // Only allow POST requests
-    if (req.method !== "POST") {
-      console.error("Method not allowed:", req.method);
-      return new Response(JSON.stringify({ error: "Method not allowed" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 405,
-      });
-    }
+    // Get request payload and log it (without sensitive data)
+    const payload = await req.json();
+    const { name, schoolId, adminUserId: initialAdminUserId, debug, checkEnv, createTestUser } = payload;
+    console.log(`Payload received: name=${name}, schoolId=${schoolId}, adminUserId type=${typeof initialAdminUserId}, starts with: ${initialAdminUserId?.substring(0, 5) || 'undefined'}`);
 
-    // Get the request body
-    const body: RequestBody = await req.json();
+    // Use a mutable variable for adminUserId
+    let adminUserId = initialAdminUserId;
 
-    // Validate the request body
-    if (!body.name || !body.schoolId || !body.adminUserId) {
-      console.error("Missing required fields:", body);
-      return new Response(JSON.stringify({ error: "Missing required fields: name, schoolId, or adminUserId" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
-      });
-    }
-
-    // Get the Clerk secret key from environment variables
-    const clerkSecretKey = Deno.env.get("CLERK_SECRET_KEY");
-    if (!clerkSecretKey || clerkSecretKey.trim() === "") {
-      console.error("CLERK_SECRET_KEY not set or empty");
-      return new Response(JSON.stringify({ error: "Server configuration error: CLERK_SECRET_KEY not set or empty" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
-      });
-    }
-
-    console.log("Creating organization in Clerk with name:", body.name);
-    console.log("Admin user ID:", body.adminUserId);
-
-    // 1. Check if user exists in Clerk first
-    const userResponse = await fetch(`https://api.clerk.dev/v1/users/${body.adminUserId}`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${clerkSecretKey}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!userResponse.ok) {
-      const errorData = await userResponse.json();
-      console.error("User verification failed:", errorData);
-      return new Response(JSON.stringify({ 
-        error: `User verification failed: ${userResponse.statusText}`, 
-        details: errorData 
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: userResponse.status,
-      });
-    }
-
-    const userData = await userResponse.json();
-    console.log("User exists in Clerk:", userData.id);
-
-    // 2. Create a new organization in Clerk
-    const createResponse = await fetch("https://api.clerk.dev/v1/organizations", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${clerkSecretKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name: body.name,
-        public_metadata: {
-          schoolId: body.schoolId,
-        },
-      }),
-    });
-
-    if (!createResponse.ok) {
-      const errorData = await createResponse.json();
-      console.error("Clerk API error during organization creation:", errorData);
-      return new Response(JSON.stringify({ 
-        error: `Clerk API error: ${createResponse.statusText}`, 
-        details: errorData 
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: createResponse.status,
-      });
-    }
-
-    const orgData = await createResponse.json();
-    if (!orgData || !orgData.id) {
-      console.error("Invalid response from Clerk organization creation:", orgData);
-      return new Response(JSON.stringify({ error: "Invalid organization response from Clerk" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500, 
-      });
-    }
-
-    console.log("Successfully created organization in Clerk with ID:", orgData.id);
-    
-    // 3. Add the admin user to the organization with admin role
-    // Increased delay - wait 3 seconds instead of 1 to ensure Clerk has fully processed the organization creation
-    console.log("Waiting for organization to propagate in Clerk system...");
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    console.log(`Adding admin user ${body.adminUserId} to organization ${orgData.id}`);
-    
-    // Implement retry logic for adding the admin user
-    let membershipResponse = null;
-    let membershipSuccess = false;
-    let membershipError = null;
-    let attemptCount = 0;
-    const maxAttempts = 3;
-    
-    while (!membershipSuccess && attemptCount < maxAttempts) {
-      attemptCount++;
-      console.log(`Attempt ${attemptCount} to add admin user to organization...`);
+    // Special diagnostic mode to check environment variables
+    if (debug === true || checkEnv === true) {
+      console.log("Running in diagnostic mode");
+      const secretKeyInfo = clerkSecretKey ? {
+        length: clerkSecretKey.length,
+        prefix: clerkSecretKey.substring(0, 7),
+        valid: clerkSecretKey.startsWith('sk_test_') || clerkSecretKey.startsWith('sk_live_')
+      } : null;
       
-      try {
-        membershipResponse = await fetch(`https://api.clerk.dev/v1/organizations/${orgData.id}/memberships`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${clerkSecretKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            user_id: body.adminUserId,
-            role: "admin",
-          }),
-        });
-        
-        if (membershipResponse.ok) {
-          membershipSuccess = true;
-          const membershipData = await membershipResponse.json();
-          console.log("Admin user successfully added to organization:", membershipData);
-        } else {
-          membershipError = await membershipResponse.json();
-          console.error(`Attempt ${attemptCount} failed:`, membershipError);
-          
-          // Wait longer between retries
-          const waitTime = attemptCount * 2000; // Progressive backoff
-          console.log(`Waiting ${waitTime}ms before retry...`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
+      return new Response(
+        JSON.stringify({
+          clerkKeyPresent: !!clerkSecretKey,
+          clerkKeyInfo: secretKeyInfo,
+          env: {
+            SUPABASE_ENV: Deno.env.get("SUPABASE_ENV"),
+            SUPABASE_URL: Deno.env.get("SUPABASE_URL"),
+            SUPABASE_ANON_KEY: !!Deno.env.get("SUPABASE_ANON_KEY"),
+            SUPABASE_SERVICE_ROLE_KEY: !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+          }
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
         }
-      } catch (error) {
-        console.error(`Attempt ${attemptCount} threw exception:`, error);
-        membershipError = error;
+      );
+    }
+
+    // Support creating a test user if requested
+    let testUserId = null;
+    if (createTestUser === true) {
+      try {
+        console.log("Creating a test user for organization membership testing");
+        const testUser = await clerk.users.createUser({
+          firstName: "Test",
+          lastName: `User ${Date.now()}`,
+          emailAddress: [`test-${Date.now()}@example.com`],
+          password: `SecureP@ssw0rd-${Date.now()}`
+        });
+        testUserId = testUser.id;
+        console.log(`Created test user with ID: ${testUserId}`);
         
-        // Wait longer between retries
-        const waitTime = attemptCount * 2000;
-        console.log(`Waiting ${waitTime}ms before retry...`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
+        // Update adminUserId to use the test user
+        if (!adminUserId) {
+          console.log(`Using test user ${testUserId} as adminUserId`);
+          adminUserId = testUserId;
+        }
+      } catch (userError) {
+        console.error(`Failed to create test user: ${userError.message}`);
       }
     }
-    
-    if (!membershipSuccess) {
-      console.error("All attempts to add admin user failed:", membershipError);
+
+    // Enhanced validation
+    if (!name || !schoolId) {
+      return new Response(
+        JSON.stringify({
+          error: "Missing required fields: name and schoolId are required"
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
+    }
+
+    if (!adminUserId || !isValidUserId(adminUserId)) {
+      return new Response(
+        JSON.stringify({
+          error: `Invalid adminUserId format: ${adminUserId}. Must start with 'user_'`
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
+    }
+
+    // Verify user exists before creating organization
+    try {
+      console.log(`Verifying user exists: ${adminUserId}`);
+      const user = await clerk.users.getUser(adminUserId);
+      console.log(`User exists with email: ${user.emailAddresses[0]?.emailAddress || 'not found'}`);
+    } catch (userError) {
+      console.error(`Failed to verify user exists: ${userError.message}`);
+      return new Response(
+        JSON.stringify({ 
+          error: `User verification failed: ${userError.message}`,
+          details: userError 
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
+    }
+
+    // Create the organization in Clerk
+    let organization;
+    let adminAdded = false;
+    let warning = null;
+
+    try {
+      // Create organization in Clerk
+      console.log(`Creating organization: "${name}" for school: ${schoolId}`);
+      organization = await clerk.organizations.createOrganization({
+        name: name,
+        // Add more metadata if needed
+        privateMetadata: {
+          schoolId: schoolId,
+          createdAt: new Date().toISOString()
+        }
+      });
       
-      // Return the organization ID but with error details
-      // Use status 200 since org was created, but include detailed error info
-      return new Response(JSON.stringify({ 
-        id: orgData.id, 
-        warning: "Organization created but admin user could not be added automatically. Will retry on next login.",
-        adminAdded: false,
-        error: membershipError
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200, // Return 200 since org was created
-      });
+      console.log(`Created Clerk organization: ${organization.id} for school: ${schoolId}`);
+      
+      // Add the admin user to the organization
+      try {
+        console.log(`Attempting to add user ${adminUserId} as admin to organization ${organization.id}`);
+        const membership = await clerk.organizations.createOrganizationMembership({
+          organizationId: organization.id,
+          userId: adminUserId,
+          role: "org:admin"
+        });
+        
+        adminAdded = true;
+        console.log(`Successfully added user ${adminUserId} as admin to organization ${organization.id}. Membership ID: ${membership.id}`);
+        
+        // Verify membership actually worked
+        try {
+          const memberships = await clerk.users.getOrganizationMembershipList({ userId: adminUserId });
+          const foundMembership = memberships.find(m => m.organization.id === organization.id);
+          
+          if (foundMembership) {
+            console.log(`Verified: User ${adminUserId} is a member of organization ${organization.id} with role ${foundMembership.role}`);
+          } else {
+            console.error(`Verification failed: User ${adminUserId} is not a member of organization ${organization.id} despite successful membership creation`);
+            warning = "Membership verification failed - user not found in organization membership list";
+            adminAdded = false;
+          }
+        } catch (verifyError) {
+          console.error(`Failed to verify membership: ${verifyError.message}`);
+          warning = `Membership verification failed: ${verifyError.message}`;
+        }
+        
+      } catch (membershipError) {
+        adminAdded = false;
+        console.error(`Failed to add user as admin: ${membershipError.message}`);
+        warning = `Admin user created but membership failed: ${membershipError.message}`;
+        
+        // Try with different error handling approach
+        try {
+          console.log("Attempting alternative membership creation approach...");
+          await clerk.organizations.createOrganizationMembership({
+            organizationId: organization.id,
+            userId: adminUserId,
+            role: "org:admin"
+          });
+          adminAdded = true;
+          console.log("Alternative membership creation approach succeeded");
+        } catch (retryError) {
+          console.error(`Alternative approach also failed: ${retryError.message}`);
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to create Clerk organization: ${error.message}`);
+      // Format the error for better debugging
+      const formattedError = {
+        message: error.message,
+        type: error.name || typeof error,
+        stack: error.stack,
+        details: error.details || null
+      };
+      
+      return new Response(
+        JSON.stringify({ 
+          error: `Failed to create Clerk organization: ${error.message}`,
+          details: formattedError
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
     }
     
-    // 4. Verify the membership exists
-    console.log("Verifying organization membership...");
-    const verifyMembershipResponse = await fetch(`https://api.clerk.dev/v1/organizations/${orgData.id}/memberships`, {
-      headers: {
-        Authorization: `Bearer ${clerkSecretKey}`,
-        "Content-Type": "application/json",
-      },
-    });
+    // Return response with clear indication of partial success if applicable
+    const responseStatus = adminAdded ? 200 : 207; // Use 207 Multi-Status for partial success
     
-    if (!verifyMembershipResponse.ok) {
-      console.error("Failed to verify memberships:", await verifyMembershipResponse.json());
-      return new Response(JSON.stringify({ 
-        id: orgData.id,
-        warning: "Organization created and admin user added, but membership verification failed.",
-        adminAdded: true,
-        membershipVerified: false
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
-    }
-    
-    const memberships = await verifyMembershipResponse.json();
-    console.log("Current organization memberships:", memberships);
-    
-    const adminExists = memberships.data.some(
-      member => member.public_user_data.user_id === body.adminUserId && member.role === "admin"
+    return new Response(
+      JSON.stringify({
+        id: organization.id,
+        name: name,
+        adminAdded: adminAdded,
+        membershipVerified: adminAdded && !warning,
+        warning: warning,
+        success: true,
+        testUserId: testUserId
+      }),
+      {
+        status: responseStatus,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      }
     );
-    
-    if (!adminExists) {
-      console.error("Admin user not found in organization memberships after adding");
-      return new Response(JSON.stringify({ 
-        id: orgData.id,
-        warning: "Organization created but admin user membership was not verified. Will retry on next login.",
-        adminAdded: true,
-        membershipVerified: false
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200, 
-      });
-    }
-    
-    // Return the organization ID with detailed success information
-    return new Response(JSON.stringify({ 
-      id: orgData.id,
-      message: "Organization created and admin user added successfully",
-      adminAdded: true,
-      membershipVerified: true,
-      membershipStatus: "success",
-    }), {
-      headers: { 
-        ...corsHeaders, 
-        "Content-Type": "application/json",
-      },
-      status: 200,
-    });
   } catch (error) {
-    console.error("Unhandled error:", error.message, error.stack);
-    return new Response(JSON.stringify({ 
-      error: `Server error: ${error.message}`,
-      stack: error.stack 
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+    console.error(`Unhandled error in create-organization function: ${error.message}`);
+    console.error(error.stack || "No stack trace available");
+    
+    return new Response(
+      JSON.stringify({ 
+        error: error.message,
+        stack: error.stack,
+        type: error.name || typeof error
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      }
+    );
   }
 });
