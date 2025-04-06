@@ -227,7 +227,8 @@ const AdminSignup: React.FC = () => {
           try {
             clerkOrgId = await createClerkOrganization(
               selectedSchool.name,
-              formData.schoolId!
+              formData.schoolId!,
+              result.createdUserId
             );
             
             if (!clerkOrgId) {

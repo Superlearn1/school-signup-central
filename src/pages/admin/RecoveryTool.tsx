@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useUser, useOrganization } from '@clerk/clerk-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -58,7 +59,8 @@ const RecoveryTool: React.FC = () => {
       // Create a new Clerk organization using our service
       const clerkOrgId = await createClerkOrganization(
         school.name,
-        school.id
+        school.id,
+        user.id
       );
 
       // Update the school record with the new Clerk org ID
