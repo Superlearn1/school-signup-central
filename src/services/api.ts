@@ -31,10 +31,19 @@ export const checkSchoolAvailability = async (schoolId: string): Promise<boolean
   return !data.claimed;
 };
 
-export const claimSchool = async (schoolId: string, clerkUserId: string): Promise<void> => {
+export const claimSchool = async (schoolId: string, clerkUserId: string, clerkOrgId?: string): Promise<void> => {
+  const updateData: any = { 
+    claimed: true, 
+    claimed_by_user_id: clerkUserId
+  };
+  
+  if (clerkOrgId) {
+    updateData.clerk_org_id = clerkOrgId;
+  }
+  
   const { error } = await supabase
     .from('schools')
-    .update({ claimed: true, claimed_by_user_id: clerkUserId })
+    .update(updateData)
     .eq('id', schoolId);
 
   if (error) {

@@ -235,14 +235,38 @@ const AdminSignup: React.FC = () => {
       
       if (selectedSchool && result.createdUserId) {
         try {
-          // Claim the school
-          await claimSchool(formData.schoolId!, result.createdUserId);
+          // First create a Clerk organization
+          const clerkOrgResponse = await fetch('/api/create-organization', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              name: selectedSchool.name,
+              schoolId: formData.schoolId
+            }),
+          });
+
+          if (!clerkOrgResponse.ok) {
+            throw new Error('Failed to create Clerk organization');
+          }
+
+          const clerkOrgData = await clerkOrgResponse.json();
+          const clerkOrgId = clerkOrgData.id;
+
+          if (!clerkOrgId) {
+            throw new Error('No organization ID returned from Clerk');
+          }
+
+          // Claim the school with the clerk org ID
+          await claimSchool(formData.schoolId!, result.createdUserId, clerkOrgId);
           
-          // Create organization in Supabase
+          // Create organization in Supabase with the clerk org ID
           const organization = await createOrganization(
             formData.schoolId!, 
             result.createdUserId, 
-            selectedSchool.name
+            selectedSchool.name,
+            clerkOrgId
           );
           
           // Create admin profile

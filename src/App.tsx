@@ -12,6 +12,7 @@ import AdminSignup from "./pages/AdminSignup";
 import Subscription from "./pages/Subscription";
 import Dashboard from "./pages/Dashboard";
 import StudentManagement from "./pages/StudentManagement";
+import RecoveryTool from "./pages/admin/RecoveryTool";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -106,6 +107,14 @@ const App = () => {
                 element={
                   <ProtectedRoute>
                     <StudentManagement />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/admin/recovery" 
+                element={
+                  <ProtectedRoute>
+                    <RecoveryTool />
                   </ProtectedRoute>
                 } 
               />
