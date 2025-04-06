@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useOrganization, useUser, useClerk } from '@clerk/clerk-react';
 import { useToast } from '@/hooks/use-toast';
@@ -181,8 +182,9 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
           debugLog(`Attempting to reload organization (attempt ${orgLoadAttempts + 1})`);
           setIsFixingOrganization(true);
           
-          if (clerk.client) {
-            await clerk.client.organization?.reload();
+          // Fixed: Check if clerk.client exists first, then access its organization property
+          if (clerk.client && clerk.client.organization) {
+            await clerk.client.organization.reload();
             debugLog('Reloaded organization via clerk.client');
           }
           
@@ -355,7 +357,8 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
       debugLog('Public Metadata', effectiveOrg.publicMetadata);
       
       try {
-        const privateMeta = effectiveOrg['privateMetadata'] || effectiveOrg._privateMetadata;
+        // Fixed: Removed reference to _privateMetadata, use only privateMetadata
+        const privateMeta = effectiveOrg['privateMetadata'];
         debugLog('Alternative privateMetadata access attempt', privateMeta);
         
         for (const key in effectiveOrg) {
@@ -508,6 +511,7 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
       let alternateOrgId = null;
       
       try {
+        // Fixed: Check if clerk.client exists and organization property exists before accessing id
         if (clerk.client && clerk.client.organization) {
           alternateOrgId = clerk.client.organization.id;
           debugLog('Retrieved alternate organization ID from clerk.client:', alternateOrgId);
