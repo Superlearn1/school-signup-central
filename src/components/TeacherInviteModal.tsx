@@ -66,8 +66,7 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
       const invitation = await organization.inviteMember({
         emailAddress: email,
         role: 'org:teacher',
-        // Use fallbackRedirectUrl for Clerk's latest API
-        fallbackRedirectUrl: window.location.origin + '/dashboard',
+        // Remove the fallbackRedirectUrl property as it's not supported
       });
 
       // Update used_teacher_seats in Supabase
