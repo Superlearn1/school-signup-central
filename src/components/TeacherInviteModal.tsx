@@ -1,12 +1,13 @@
 
-import React, { useState } from 'react';
-import { useOrganization } from '@clerk/clerk-react';
+import React, { useState, useEffect } from 'react';
+import { useOrganization, useUser } from '@clerk/clerk-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
+import { checkAndFixOrganizationAdmin } from '@/services/organization';
 
 interface TeacherInviteModalProps {
   isOpen: boolean;
@@ -17,8 +18,54 @@ interface TeacherInviteModalProps {
 const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isFixingOrganization, setIsFixingOrganization] = useState(false);
   const { organization } = useOrganization();
+  const { user } = useUser();
   const { toast } = useToast();
+
+  // Check and fix organization membership when modal opens
+  useEffect(() => {
+    if (isOpen && organization?.id) {
+      verifyOrganizationSetup();
+    }
+  }, [isOpen, organization?.id]);
+
+  const verifyOrganizationSetup = async () => {
+    if (!organization?.id || !user) return;
+    
+    try {
+      setIsFixingOrganization(true);
+      
+      // Check if current user is a member of the organization
+      const members = await organization.getMemberships();
+      const currentUserIsMember = members.data.some(
+        member => member.publicUserData.userId === user.id
+      );
+      
+      if (!currentUserIsMember) {
+        // Try to fix the membership via our edge function
+        console.log("Current user is not a member of the organization. Attempting to fix...");
+        await checkAndFixOrganizationAdmin(organization.id);
+        
+        // Refresh the organization data
+        await organization.reload();
+        
+        toast({
+          title: 'Organization membership verified',
+          description: 'Your administrator access has been confirmed.',
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fix organization membership:", error);
+      toast({
+        title: 'Organization setup issue',
+        description: 'There was a problem verifying your organization access. Please refresh and try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsFixingOrganization(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,6 +108,9 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
       if (subscriptionData.used_teacher_seats >= subscriptionData.total_teacher_seats) {
         throw new Error('You have reached your teacher seat limit. Please upgrade your subscription to add more teachers.');
       }
+
+      // Verify organization membership again just to be sure
+      await verifyOrganizationSetup();
 
       // Send invitation via Clerk - using the correct API method
       const invitation = await organization.inviteMember({
@@ -122,7 +172,7 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
                 placeholder="teacher@school.edu" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
+                disabled={isLoading || isFixingOrganization}
                 required
               />
             </div>
@@ -133,12 +183,19 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
               type="button" 
               variant="outline" 
               onClick={onClose}
-              disabled={isLoading}
+              disabled={isLoading || isFixingOrganization}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Sending...' : 'Send Invitation'}
+            <Button 
+              type="submit" 
+              disabled={isLoading || isFixingOrganization}
+            >
+              {isFixingOrganization 
+                ? 'Verifying access...' 
+                : isLoading 
+                  ? 'Sending...' 
+                  : 'Send Invitation'}
             </Button>
           </DialogFooter>
         </form>

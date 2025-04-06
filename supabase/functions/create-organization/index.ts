@@ -7,6 +7,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 interface RequestBody {
   name: string;
   schoolId: string;
+  adminUserId: string;  // Add admin user ID to the request
 }
 
 // Define proper CORS headers that include all required headers
@@ -38,8 +39,8 @@ serve(async (req) => {
     const body: RequestBody = await req.json();
 
     // Validate the request body
-    if (!body.name || !body.schoolId) {
-      return new Response(JSON.stringify({ error: "Missing required fields: name or schoolId" }), {
+    if (!body.name || !body.schoolId || !body.adminUserId) {
+      return new Response(JSON.stringify({ error: "Missing required fields: name, schoolId, or adminUserId" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
       });
@@ -57,7 +58,7 @@ serve(async (req) => {
     console.log("Creating organization in Clerk with name:", body.name);
 
     // Create a new organization in Clerk
-    const response = await fetch("https://api.clerk.dev/v1/organizations", {
+    const createResponse = await fetch("https://api.clerk.dev/v1/organizations", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${clerkSecretKey}`,
@@ -65,26 +66,59 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         name: body.name,
-        metadata: {
+        public_metadata: {
           schoolId: body.schoolId,
         },
       }),
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Clerk API error:", errorData);
-      return new Response(JSON.stringify({ error: `Clerk API error: ${response.statusText}`, details: errorData }), {
+    if (!createResponse.ok) {
+      const errorData = await createResponse.json();
+      console.error("Clerk API error during organization creation:", errorData);
+      return new Response(JSON.stringify({ error: `Clerk API error: ${createResponse.statusText}`, details: errorData }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: response.status,
+        status: createResponse.status,
       });
     }
 
-    const data = await response.json();
-    console.log("Successfully created organization in Clerk with ID:", data.id);
+    const orgData = await createResponse.json();
+    console.log("Successfully created organization in Clerk with ID:", orgData.id);
     
-    // Return the organization ID
-    return new Response(JSON.stringify({ id: data.id }), {
+    // Now add the admin user to the organization with admin role
+    console.log(`Adding admin user ${body.adminUserId} to organization ${orgData.id}`);
+    const membershipResponse = await fetch(`https://api.clerk.dev/v1/organizations/${orgData.id}/memberships`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${clerkSecretKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_id: body.adminUserId,
+        role: "admin",
+      }),
+    });
+
+    if (!membershipResponse.ok) {
+      const membershipError = await membershipResponse.json();
+      console.error("Failed to add admin user to organization:", membershipError);
+      // Still return the org ID since it was created, even if adding admin failed
+      return new Response(JSON.stringify({ 
+        id: orgData.id, 
+        warning: "Organization created but admin user could not be added automatically" 
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
+    const membershipData = await membershipResponse.json();
+    console.log("Admin user successfully added to organization:", membershipData);
+    
+    // Return the organization ID with success message
+    return new Response(JSON.stringify({ 
+      id: orgData.id,
+      message: "Organization created and admin user added successfully" 
+    }), {
       headers: { 
         ...corsHeaders, 
         "Content-Type": "application/json",
