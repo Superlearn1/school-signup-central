@@ -182,9 +182,10 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
           debugLog(`Attempting to reload organization (attempt ${orgLoadAttempts + 1})`);
           setIsFixingOrganization(true);
           
-          // Fixed: Check if clerk.client exists first, then access its organization property
-          if (clerk.client && clerk.client.organization) {
-            await clerk.client.organization.reload();
+          // Fixed: Safely check for clerk.client and client.organization before accessing methods
+          const clerkClient = clerk?.client;
+          if (clerkClient && 'organization' in clerkClient && clerkClient.organization) {
+            await clerkClient.organization.reload();
             debugLog('Reloaded organization via clerk.client');
           }
           
@@ -208,7 +209,7 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
     return () => {
       isMounted.current = false;
     };
-  }, [isOpen, orgIsLoaded, organization, orgLoadAttempts, clerk.client]);
+  }, [isOpen, orgIsLoaded, organization, orgLoadAttempts, clerk]);
   
   const getOrganizationId = () => {
     if (!organization) return null;
@@ -511,9 +512,10 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
       let alternateOrgId = null;
       
       try {
-        // Fixed: Check if clerk.client exists and organization property exists before accessing id
-        if (clerk.client && clerk.client.organization) {
-          alternateOrgId = clerk.client.organization.id;
+        // Fixed: Safely check for clerk.client and client.organization before accessing its id
+        const clerkClient = clerk?.client;
+        if (clerkClient && 'organization' in clerkClient && clerkClient.organization) {
+          alternateOrgId = clerkClient.organization.id;
           debugLog('Retrieved alternate organization ID from clerk.client:', alternateOrgId);
         }
       } catch (err) {
