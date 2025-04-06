@@ -225,6 +225,9 @@ const AdminSignup: React.FC = () => {
         try {
           let clerkOrgId;
           try {
+            const startTime = Date.now();
+            console.log(`Starting creation of Clerk organization for ${selectedSchool.name} at ${new Date(startTime).toISOString()}`);
+            
             clerkOrgId = await createClerkOrganization(
               selectedSchool.name,
               formData.schoolId!,
@@ -234,6 +237,9 @@ const AdminSignup: React.FC = () => {
             if (!clerkOrgId) {
               throw new Error('No organization ID returned from the server');
             }
+            
+            const endTime = Date.now();
+            console.log(`Clerk organization created with ID: ${clerkOrgId} in ${endTime - startTime}ms`);
           } catch (error: any) {
             console.error('Failed to create Clerk organization:', error);
             toast({

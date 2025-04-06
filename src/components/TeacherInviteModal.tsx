@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { checkAndFixOrganizationAdmin } from '@/services/organization';
+import { checkAndFixOrganizationAdmin, verifyOrganizationAdminWithRetry } from '@/services/organization';
 
 interface TeacherInviteModalProps {
   isOpen: boolean;
@@ -24,68 +24,59 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
   const { user } = useUser();
   const { toast } = useToast();
 
+  // Reset verification attempts when modal opens/closes
+  useEffect(() => {
+    if (!isOpen) {
+      setVerificationAttempts(0);
+    }
+  }, [isOpen]);
+
   // Check and fix organization membership when modal opens
   useEffect(() => {
-    if (isOpen && organization?.id && verificationAttempts < 3) {
+    if (isOpen && organization?.id && verificationAttempts === 0) {
       verifyOrganizationSetup();
     }
   }, [isOpen, organization?.id, verificationAttempts]);
 
   const verifyOrganizationSetup = async () => {
-    if (!organization?.id || !user) return;
+    if (!organization?.id || !user?.id) return;
     
     try {
       setIsFixingOrganization(true);
       console.log('Verifying organization setup...');
       
-      // Check if current user is a member of the organization
-      const members = await organization.getMemberships();
-      console.log('Current organization members:', members);
-      
-      const currentUserIsMember = members.data.some(
-        member => member.publicUserData.userId === user.id
+      // Use the retry-enabled verification function
+      const verificationSucceeded = await verifyOrganizationAdminWithRetry(
+        organization.id, 
+        user.id,
+        3 // Max retry attempts
       );
       
-      if (!currentUserIsMember) {
-        // Try to fix the membership via our edge function
-        console.log("Current user is not a member of the organization. Attempting to fix...");
-        const fixed = await checkAndFixOrganizationAdmin(organization.id);
+      if (verificationSucceeded) {
+        console.log("Successfully verified organization membership");
         
-        if (fixed) {
-          console.log("Successfully fixed organization membership");
-          
-          // Refresh the organization data
-          await organization.reload();
-          
+        // Refresh the organization data
+        await organization.reload();
+        
+        toast({
+          title: 'Organization membership verified',
+          description: 'Your administrator access has been confirmed.',
+        });
+      } else {
+        console.error("Failed to verify organization membership after multiple attempts");
+        setVerificationAttempts(prev => prev + 1);
+        
+        if (verificationAttempts >= 2) {
           toast({
-            title: 'Organization membership verified',
-            description: 'Your administrator access has been confirmed.',
+            title: 'Organization setup issue',
+            description: 'There was a problem verifying your organization access. Please try refreshing the page.',
+            variant: 'destructive',
           });
         } else {
-          console.error("Failed to fix organization membership");
-          setVerificationAttempts(prev => prev + 1);
-          
-          if (verificationAttempts >= 2) {
-            toast({
-              title: 'Organization setup issue',
-              description: 'There was a problem verifying your organization access. Please try refreshing the page.',
-              variant: 'destructive',
-            });
-          } else {
-            // Retry after a short delay
-            setTimeout(() => {
-              verifyOrganizationSetup();
-            }, 2000);
-          }
-        }
-      } else {
-        console.log("User is already a member of the organization");
-        // Even if they're a member, verify they have admin role
-        const memberInfo = members.data.find(member => member.publicUserData.userId === user.id);
-        if (memberInfo && memberInfo.role !== 'admin') {
-          console.log("User is a member but not an admin. Attempting to fix...");
-          await checkAndFixOrganizationAdmin(organization.id);
-          await organization.reload();
+          // Retry once more after a delay
+          setTimeout(() => {
+            setVerificationAttempts(0); // Reset to trigger another attempt
+          }, 5000);
         }
       }
     } catch (error) {
@@ -115,7 +106,7 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
       return;
     }
 
-    if (!organization) {
+    if (!organization?.id) {
       toast({
         title: 'Organization not found',
         description: 'Unable to send invitation without an organization',
@@ -146,27 +137,43 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
         throw new Error('You have reached your teacher seat limit. Please upgrade your subscription to add more teachers.');
       }
 
-      // Verify organization membership again just to be sure
-      await verifyOrganizationSetup();
-
-      // Double-check that we have the membership info and current user is an admin
+      // Verify organization membership one more time just to be sure
+      console.log("Verifying admin access before sending invitation...");
+      setIsFixingOrganization(true);
+      
+      // Try to fix if we're not an admin yet or if we're not a member
+      await verifyOrganizationAdminWithRetry(organization.id, user?.id);
+      
+      setIsFixingOrganization(false);
+      
+      // Double-check the organization and membership status after verification
+      await organization.reload();
+      
+      // Get the current memberships to verify admin access
       const members = await organization.getMemberships();
+      console.log('Current organization members after verification:', members);
+      
       const currentUserIsMember = members.data.some(
-        member => member.publicUserData.userId === user?.id && member.role === 'admin'
+        member => member.publicUserData.userId === user?.id
       );
       
       if (!currentUserIsMember) {
-        console.error("User is still not an admin of the organization after verification");
-        toast({
-          title: 'Organization access issue',
-          description: 'You do not have admin permissions for this organization. Please refresh and try again.',
-          variant: 'destructive',
-        });
-        return;
+        console.error("User is still not a member of the organization after verification");
+        throw new Error("You do not have access to this organization. Please contact support.");
+      }
+      
+      const isAdmin = members.data.some(
+        member => member.publicUserData.userId === user?.id && member.role === "admin"
+      );
+      
+      if (!isAdmin) {
+        console.error("User is a member but not admin after verification");
+        throw new Error("You do not have admin permissions for this organization. Please contact support.");
       }
 
-      console.log("Sending invitation to:", email);
-      // Send invitation via Clerk - using the correct API method
+      console.log("User is confirmed as organization admin. Sending invitation to:", email);
+      
+      // Send invitation via Clerk
       const invitation = await organization.inviteMember({
         emailAddress: email,
         role: 'org:teacher',
