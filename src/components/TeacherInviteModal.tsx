@@ -62,13 +62,12 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
         throw new Error('You have reached your teacher seat limit. Please upgrade your subscription to add more teachers.');
       }
 
-      // Send invitation via Clerk - using the correct API method for the Clerk version
+      // Send invitation via Clerk - using the correct API method
       const invitation = await organization.inviteMember({
         emailAddress: email,
         role: 'org:teacher',
-        // Use redirectUrl instead of redirectUri if available, or omit it
-        // And fallback to regular redirect property if needed
-        redirect: window.location.origin + '/dashboard',
+        // Use fallbackRedirectUrl for Clerk's latest API
+        fallbackRedirectUrl: window.location.origin + '/dashboard',
       });
 
       // Update used_teacher_seats in Supabase
