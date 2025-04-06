@@ -43,3 +43,13 @@ It returns a JSON response with:
   "id": "org_1234567890"
 }
 ```
+
+## CORS Configuration
+
+This function includes proper CORS headers to allow cross-origin requests. The following headers are included:
+
+- `Access-Control-Allow-Origin: *`
+- `Access-Control-Allow-Headers: authorization, x-client-info, apikey, content-type`
+- `Access-Control-Allow-Methods: POST, OPTIONS`
+
+The function properly handles preflight OPTIONS requests as required by browsers.
