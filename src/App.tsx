@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -24,15 +23,9 @@ const ClerkKeyMissing = () => {
   const { toast } = useToast();
   
   React.useEffect(() => {
-    console.error('ENVIRONMENT CONFIGURATION ERROR');
-    console.error('Available environment variables:', {
-      VITE_CLERK_PUBLISHABLE_KEY: import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
-      ...import.meta.env
-    });
-
     toast({
       title: "Configuration Error",
-      description: "Clerk API key is missing or incorrectly set. Please check your environment configuration.",
+      description: "Clerk API key is missing. Please add VITE_CLERK_PUBLISHABLE_KEY to your environment.",
       variant: "destructive"
     });
   }, [toast]);
@@ -44,41 +37,23 @@ const ClerkKeyMissing = () => {
         <p className="mb-4">
           The Clerk API key is missing. The application cannot function without this key.
         </p>
-        <div className="bg-yellow-50 p-4 rounded-lg">
-          <h2 className="font-semibold mb-2">Troubleshooting Steps:</h2>
-          <ol className="list-decimal list-inside text-sm text-gray-600">
-            <li>Verify you have added VITE_CLERK_PUBLISHABLE_KEY</li>
-            <li>Check that the key starts with 'pk_test_'</li>
-            <li>Restart the development server</li>
-          </ol>
-        </div>
+        <p className="text-sm text-gray-600">
+          Please make sure <code className="bg-gray-100 px-1 py-0.5 rounded">VITE_CLERK_PUBLISHABLE_KEY</code> is set in your environment.
+        </p>
       </div>
     </div>
   );
 };
 
-// Clerk protected route component
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  return (
-    <>
-      <SignedIn>{children}</SignedIn>
-      <SignedOut>
-        <RedirectToSignIn />
-      </SignedOut>
-    </>
-  );
-};
+// Temporarily hardcoded key for development purposes
+// In production, this should be properly secured
+const TEMP_CLERK_KEY = "pk_test_cGxlYXNpbmctZG9iZXJtYW4tNDAuY2xlcmsuYWNjb3VudHMuZGV2JA";
 
 const App = () => {
-  // Debug logging for environment variables
-  console.log('ALL ENV VARS:', import.meta.env);
-  
-  // Use the environment variable directly with additional checks
   const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
   
-  // Comprehensive key validation
-  if (!clerkPubKey || typeof clerkPubKey !== 'string' || !clerkPubKey.startsWith('pk_test_')) {
-    console.error('Invalid or missing Clerk Publishable Key:', clerkPubKey);
+  // If no Clerk key is available, show the error page
+  if (!clerkPubKey) {
     return <ClerkKeyMissing />;
   }
 
@@ -132,6 +107,18 @@ const App = () => {
         </TooltipProvider>
       </QueryClientProvider>
     </ClerkProvider>
+  );
+};
+
+// Clerk protected route component
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  return (
+    <>
+      <SignedIn>{children}</SignedIn>
+      <SignedOut>
+        <RedirectToSignIn />
+      </SignedOut>
+    </>
   );
 };
 
