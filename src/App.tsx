@@ -50,27 +50,8 @@ const ClerkKeyMissing = () => {
 const TEMP_CLERK_KEY = "pk_test_cGxlYXNpbmctZG9iZXJtYW4tNDAuY2xlcmsuYWNjb3VudHMuZGV2JA";
 
 const App = () => {
-  const [clerkPubKey, setClerkPubKey] = useState<string | null>(null);
+  const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
   
-  useEffect(() => {
-    // Try to get the key from environment
-    const envKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-    
-    if (envKey) {
-      console.log("Using Clerk key from environment variables");
-      setClerkPubKey(envKey);
-      return;
-    }
-    
-    // For development purposes only - in production, implement proper key management
-    // This is a temporary solution to get the app working for demonstration
-    console.log("Using fallback Clerk key for development");
-    setClerkPubKey(TEMP_CLERK_KEY);
-    
-    // Log warning about using temporary key
-    console.warn("Using temporary Clerk key for development. In production, secure your API keys properly.");
-  }, []);
-
   // If no Clerk key is available, show the error page
   if (!clerkPubKey) {
     return <ClerkKeyMissing />;
