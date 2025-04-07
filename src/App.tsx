@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -45,11 +46,8 @@ const ClerkKeyMissing = () => {
   );
 };
 
-// Temporarily hardcoded key for development purposes
-// In production, this should be properly secured
-const TEMP_CLERK_KEY = "pk_test_cGxlYXNpbmctZG9iZXJtYW4tNDAuY2xlcmsuYWNjb3VudHMuZGV2JA";
-
 const App = () => {
+  // Use the environment variable directly
   const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
   
   // If no Clerk key is available, show the error page

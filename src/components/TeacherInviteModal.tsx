@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, memo } from 'react';
 import { useOrganization, useUser, useClerk, useOrganizationList, } from '@clerk/clerk-react';
 import { useToast } from '@/hooks/use-toast';
@@ -199,9 +200,13 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
           debugLog(`Attempting to reload organization (attempt ${orgLoadAttempts + 1})`);
           // Fixed: Safely check for clerk.client and client.organization before accessing methods
           const clerkClient = clerk?.client;
-          if (clerkClient && 'organization' in clerkClient && clerkClient.organization) {
-            await clerkClient.organization.reload();
-            debugLog('Reloaded organization via clerk.client');
+          if (clerkClient && typeof clerkClient === 'object' && 'organization' in clerkClient) {
+            const orgResource = clerkClient.organization as unknown;
+            if (orgResource && typeof orgResource === 'object' && 'reload' in orgResource && 
+                typeof (orgResource as any).reload === 'function') {
+                await (orgResource as any).reload();
+                debugLog('Reloaded organization via clerk.client');
+            }
           }
 
           await new Promise(resolve => setTimeout(resolve, 1000));
