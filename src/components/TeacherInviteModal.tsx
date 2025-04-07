@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, memo } from 'react';
 import { useOrganization, useUser, useClerk, useOrganizationList, } from '@clerk/clerk-react';
 import { useToast } from '@/hooks/use-toast';
@@ -198,14 +197,13 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
       const attemptOrgReload = async () => {
         try {
           debugLog(`Attempting to reload organization (attempt ${orgLoadAttempts + 1})`);
-          // Fixed: Safely check for clerk.client and client.organization before accessing methods
           const clerkClient = clerk?.client;
           if (clerkClient && typeof clerkClient === 'object' && 'organization' in clerkClient) {
-            const orgResource = clerkClient.organization as unknown;
+            const orgResource = clerkClient.organization;
             if (orgResource && typeof orgResource === 'object' && 'reload' in orgResource && 
                 typeof (orgResource as any).reload === 'function') {
-                await (orgResource as any).reload();
-                debugLog('Reloaded organization via clerk.client');
+              await (orgResource as any).reload();
+              debugLog('Reloaded organization via clerk.client');
             }
           }
 
@@ -377,7 +375,6 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
       debugLog('Public Metadata', effectiveOrg.publicMetadata);
 
       try {
-        // Fixed: Removed reference to _privateMetadata, use only privateMetadata
         const privateMeta = effectiveOrg['privateMetadata'];
         debugLog('Alternative privateMetadata access attempt', privateMeta);
 
@@ -531,11 +528,13 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
       let alternateOrgId = null;
 
       try {
-        // Fixed: Safely check for clerk.client and client.organization before accessing its id
         const clerkClient = clerk?.client;
-        if (clerkClient && 'organization' in clerkClient && clerkClient.organization) {
-          alternateOrgId = clerkClient.organization.id;
-          debugLog('Retrieved alternate organization ID from clerk.client:', alternateOrgId);
+        if (clerkClient && typeof clerkClient === 'object' && 'organization' in clerkClient) {
+          const orgResource = clerkClient.organization;
+          if (orgResource && typeof orgResource === 'object' && 'id' in orgResource) {
+            alternateOrgId = (orgResource as { id: string }).id;
+            debugLog('Retrieved alternate organization ID from clerk.client:', alternateOrgId);
+          }
         }
       } catch (err) {
         errorLog('Error retrieving alternate organization ID:', err);
