@@ -57,6 +57,18 @@ const ClerkKeyMissing = () => {
   );
 };
 
+// Clerk protected route component
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  return (
+    <>
+      <SignedIn>{children}</SignedIn>
+      <SignedOut>
+        <RedirectToSignIn />
+      </SignedOut>
+    </>
+  );
+};
+
 const App = () => {
   // Debug logging for environment variables
   console.log('ALL ENV VARS:', import.meta.env);
