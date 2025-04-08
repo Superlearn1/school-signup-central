@@ -1,27 +1,37 @@
-
-import React, { useState, useEffect } from 'react';
-import { useUser, useOrganization } from '@clerk/clerk-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Search, User, Edit, Trash2, FileText } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { Student } from '@/types';
-import { fetchStudents, createStudent, updateStudent, deleteStudent } from '@/services/api';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { StudentForm } from '@/components/StudentForm';
-import DashboardLayout from '@/components/layouts/DashboardLayout';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { toast } from '@/hooks/use-toast';
+import React, { useState, useEffect } from "react";
+import { useUser, useOrganization } from "@clerk/clerk-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { PlusCircle, Search, User, Edit, Trash2, FileText } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { Student } from "@/types";
+import {
+  fetchStudents,
+  createStudent,
+  updateStudent,
+  deleteStudent,
+} from "@/services/api";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import StudentForm from "@/components/StudentForm";
+import DashboardLayout from "@/components/layouts/DashboardLayout";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "@/hooks/use-toast";
 
 const StudentManagement: React.FC = () => {
   const { user } = useUser();
   const { organization } = useOrganization();
   const queryClient = useQueryClient();
   const [schoolId, setSchoolId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
 
@@ -32,9 +42,9 @@ const StudentManagement: React.FC = () => {
       try {
         if (organization?.id) {
           const { data: orgData } = await supabase
-            .from('organizations')
-            .select('school_id')
-            .eq('clerk_org_id', organization.id)
+            .from("organizations")
+            .select("school_id")
+            .eq("clerk_org_id", organization.id)
             .maybeSingle();
 
           if (orgData?.school_id) {
@@ -44,16 +54,16 @@ const StudentManagement: React.FC = () => {
         }
 
         const { data: schoolData } = await supabase
-          .from('schools')
-          .select('id')
-          .eq('claimed_by_user_id', user.id)
+          .from("schools")
+          .select("id")
+          .eq("claimed_by_user_id", user.id)
           .maybeSingle();
 
         if (schoolData?.id) {
           setSchoolId(schoolData.id);
         }
       } catch (error) {
-        console.error('Error fetching school ID:', error);
+        console.error("Error fetching school ID:", error);
       }
     };
 
@@ -61,18 +71,18 @@ const StudentManagement: React.FC = () => {
   }, [user, organization]);
 
   const { data: students = [], isLoading } = useQuery({
-    queryKey: ['students', schoolId],
-    queryFn: () => schoolId ? fetchStudents(schoolId) : Promise.resolve([]),
+    queryKey: ["students", schoolId],
+    queryFn: () => (schoolId ? fetchStudents(schoolId) : Promise.resolve([])),
     enabled: !!schoolId,
   });
 
-  const displayStudents = students.map(student => {
+  const displayStudents = students.map((student) => {
     if (!student.first_name && !student.last_name && student.full_name) {
-      const nameParts = student.full_name.split(' ');
+      const nameParts = student.full_name.split(" ");
       return {
         ...student,
-        first_name: nameParts[0] || '',
-        last_name: nameParts.slice(1).join(' ') || ''
+        first_name: nameParts[0] || "",
+        last_name: nameParts.slice(1).join(" ") || "",
       };
     }
     return student;
@@ -81,39 +91,44 @@ const StudentManagement: React.FC = () => {
   const createStudentMutation = useMutation({
     mutationFn: createStudent,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ["students"] });
       setIsFormOpen(false);
       toast({
-        title: 'Success',
-        description: 'Student created successfully',
+        title: "Success",
+        description: "Student created successfully",
       });
     },
     onError: (error) => {
       toast({
-        title: 'Error',
-        description: `Failed to create student: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        variant: 'destructive',
+        title: "Error",
+        description: `Failed to create student: ${error instanceof Error ? error.message : "Unknown error"}`,
+        variant: "destructive",
       });
     },
   });
 
   const updateStudentMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Omit<Student, 'id' | 'created_at'>> }) => 
-      updateStudent(id, data),
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: Partial<Omit<Student, "id" | "created_at">>;
+    }) => updateStudent(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ["students"] });
       setIsFormOpen(false);
       setEditingStudent(null);
       toast({
-        title: 'Success',
-        description: 'Student updated successfully',
+        title: "Success",
+        description: "Student updated successfully",
       });
     },
     onError: (error) => {
       toast({
-        title: 'Error',
-        description: `Failed to update student: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        variant: 'destructive',
+        title: "Error",
+        description: `Failed to update student: ${error instanceof Error ? error.message : "Unknown error"}`,
+        variant: "destructive",
       });
     },
   });
@@ -121,53 +136,60 @@ const StudentManagement: React.FC = () => {
   const deleteStudentMutation = useMutation({
     mutationFn: deleteStudent,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['students'] });
+      queryClient.invalidateQueries({ queryKey: ["students"] });
       toast({
-        title: 'Success',
-        description: 'Student deleted successfully',
+        title: "Success",
+        description: "Student deleted successfully",
       });
     },
     onError: (error) => {
       toast({
-        title: 'Error',
-        description: `Failed to delete student: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        variant: 'destructive',
+        title: "Error",
+        description: `Failed to delete student: ${error instanceof Error ? error.message : "Unknown error"}`,
+        variant: "destructive",
       });
     },
   });
 
-  const handleAddStudent = (studentData: Omit<Student, 'id' | 'created_at' | 'updated_at'>) => {
+  const handleAddStudent = (
+    studentData: Omit<Student, "id" | "created_at" | "updated_at">,
+  ) => {
     if (schoolId) {
       const newStudent = {
         ...studentData,
         school_id: schoolId,
         first_name: studentData.first_name,
         last_name: studentData.last_name,
-        full_name: studentData.full_name || `${studentData.first_name} ${studentData.last_name}`.trim(),
+        full_name:
+          studentData.full_name ||
+          `${studentData.first_name} ${studentData.last_name}`.trim(),
       };
-      
+
       createStudentMutation.mutate(newStudent);
     }
   };
 
-  const handleUpdateStudent = (studentData: Partial<Omit<Student, 'id' | 'created_at'>>) => {
+  const handleUpdateStudent = (
+    studentData: Partial<Omit<Student, "id" | "created_at">>,
+  ) => {
     if (editingStudent) {
       updateStudentMutation.mutate({
         id: editingStudent.id,
         data: {
           ...studentData,
-          full_name: studentData.full_name || (
-            (studentData.first_name !== undefined || studentData.last_name !== undefined) ? 
-              `${studentData.first_name || editingStudent.first_name || ''} ${studentData.last_name || editingStudent.last_name || ''}`.trim() : 
-              undefined
-          ),
+          full_name:
+            studentData.full_name ||
+            (studentData.first_name !== undefined ||
+            studentData.last_name !== undefined
+              ? `${studentData.first_name || editingStudent.first_name || ""} ${studentData.last_name || editingStudent.last_name || ""}`.trim()
+              : undefined),
         },
       });
     }
   };
 
   const handleDeleteStudent = (studentId: string) => {
-    if (confirm('Are you sure you want to delete this student?')) {
+    if (confirm("Are you sure you want to delete this student?")) {
       deleteStudentMutation.mutate(studentId);
     }
   };
@@ -184,10 +206,16 @@ const StudentManagement: React.FC = () => {
 
   const filteredStudents = displayStudents.filter(
     (student) =>
-      (student.first_name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-      (student.last_name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-      (student.full_name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-      student.student_id.toLowerCase().includes(searchQuery.toLowerCase())
+      (student.first_name?.toLowerCase() || "").includes(
+        searchQuery.toLowerCase(),
+      ) ||
+      (student.last_name?.toLowerCase() || "").includes(
+        searchQuery.toLowerCase(),
+      ) ||
+      (student.full_name?.toLowerCase() || "").includes(
+        searchQuery.toLowerCase(),
+      ) ||
+      student.student_id.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   return (
@@ -205,7 +233,7 @@ const StudentManagement: React.FC = () => {
           <TabsTrigger value="all">All Students</TabsTrigger>
           <TabsTrigger value="recent">Recently Added</TabsTrigger>
         </TabsList>
-        
+
         <div className="flex items-center gap-2 mt-4">
           <Search className="h-4 w-4 text-muted-foreground" />
           <Input
@@ -249,10 +277,18 @@ const StudentManagement: React.FC = () => {
                         {student.first_name} {student.last_name}
                       </CardTitle>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => handleEditStudent(student)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEditStudent(student)}
+                        >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteStudent(student.id)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteStudent(student.id)}
+                        >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
@@ -277,7 +313,11 @@ const StudentManagement: React.FC = () => {
         <TabsContent value="recent" className="mt-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredStudents
-              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+              .sort(
+                (a, b) =>
+                  new Date(b.created_at).getTime() -
+                  new Date(a.created_at).getTime(),
+              )
               .slice(0, 6)
               .map((student) => (
                 <Card key={student.id} className="overflow-hidden">
@@ -287,10 +327,18 @@ const StudentManagement: React.FC = () => {
                         {student.first_name} {student.last_name}
                       </CardTitle>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => handleEditStudent(student)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEditStudent(student)}
+                        >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteStudent(student.id)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteStudent(student.id)}
+                        >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>

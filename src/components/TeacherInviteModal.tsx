@@ -1,13 +1,31 @@
-import React, { useState, useEffect, memo } from 'react';
-import { useOrganization, useUser, useClerk, useOrganizationList, } from '@clerk/clerk-react';
-import { useToast } from '@/hooks/use-toast';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { supabase } from '@/integrations/supabase/client';
-import { checkAndFixOrganizationAdmin, verifyOrganizationAdminWithRetry } from '@/services/organization';
-import { setupClerkDiagnostics, diagnoseClerkOrganization } from '@/utils/clerk-diagnostics';
+import React, { useState, useEffect, memo } from "react";
+import {
+  useOrganization,
+  useUser,
+  useClerk,
+  useOrganizationList,
+} from "@clerk/clerk-react";
+import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  checkAndFixOrganizationAdmin,
+  verifyOrganizationAdminWithRetry,
+} from "@/services/organization";
+import {
+  setupClerkDiagnostics,
+  diagnoseClerkOrganization,
+} from "@/utils/clerk-diagnostics";
 
 declare global {
   interface Window {
@@ -31,15 +49,21 @@ interface ExtendedOrganizationResource {
   };
   reload: () => Promise<void>;
   getMemberships: () => Promise<any>;
-  inviteMember: (params: { emailAddress: string; role: string }) => Promise<any>;
+  inviteMember: (params: {
+    emailAddress: string;
+    role: string;
+  }) => Promise<any>;
 }
 
 const debugLog = (message: string, data?: any) => {
-  console.log(`[TeacherInvite] 🔍 ${message}`, data !== undefined ? data : '');
+  console.log(`[TeacherInvite] 🔍 ${message}`, data !== undefined ? data : "");
 };
 
 const errorLog = (message: string, error?: any) => {
-  console.error(`[TeacherInvite] ❌ ${message}`, error !== undefined ? error : '');
+  console.error(
+    `[TeacherInvite] ❌ ${message}`,
+    error !== undefined ? error : "",
+  );
   if (error?.stack) {
     console.error(`[TeacherInvite] Stack:`, error.stack);
   }
@@ -50,105 +74,157 @@ const setupGlobalDiagnosticTool = (organization: any) => {
     (window as any).__diagnoseClerData = {
       organization,
       inspectOrg: () => {
-        console.group('🔎 Organization Inspector');
-        console.log('Organization object:', organization);
-        console.log('Organization constructor:', organization?.constructor?.name);
-        console.log('Organization prototype:', Object.getPrototypeOf(organization));
-        console.log('Organization keys:', Object.keys(organization));
-        console.log('Has privateMetadata property:', Object.prototype.hasOwnProperty.call(organization, 'privateMetadata'));
-        console.log('Has publicMetadata property:', Object.prototype.hasOwnProperty.call(organization, 'publicMetadata'));
+        console.group("🔎 Organization Inspector");
+        console.log("Organization object:", organization);
+        console.log(
+          "Organization constructor:",
+          organization?.constructor?.name,
+        );
+        console.log(
+          "Organization prototype:",
+          Object.getPrototypeOf(organization),
+        );
+        console.log("Organization keys:", Object.keys(organization));
+        console.log(
+          "Has privateMetadata property:",
+          Object.prototype.hasOwnProperty.call(organization, "privateMetadata"),
+        );
+        console.log(
+          "Has publicMetadata property:",
+          Object.prototype.hasOwnProperty.call(organization, "publicMetadata"),
+        );
 
         const privateMetaDescriptor = Object.getOwnPropertyDescriptor(
           Object.getPrototypeOf(organization) || {},
-          'privateMetadata'
+          "privateMetadata",
         );
-        console.log('privateMetadata property descriptor:', privateMetaDescriptor);
+        console.log(
+          "privateMetadata property descriptor:",
+          privateMetaDescriptor,
+        );
 
-        console.log('Direct access - organization.privateMetadata:', organization.privateMetadata);
-        console.log('Bracket access - organization["privateMetadata"]:', organization['privateMetadata']);
-        console.log('Using reflect - Reflect.get(organization, "privateMetadata"):',
-          Reflect.get(organization, 'privateMetadata'));
+        console.log(
+          "Direct access - organization.privateMetadata:",
+          organization.privateMetadata,
+        );
+        console.log(
+          'Bracket access - organization["privateMetadata"]:',
+          organization["privateMetadata"],
+        );
+        console.log(
+          'Using reflect - Reflect.get(organization, "privateMetadata"):',
+          Reflect.get(organization, "privateMetadata"),
+        );
 
         console.groupEnd();
       },
       testReload: async () => {
-        console.group('🔄 Organization Reload Test');
-        console.log('Before reload - privateMetadata:', organization.privateMetadata);
-        console.log('Before reload - publicMetadata:', organization.publicMetadata);
+        console.group("🔄 Organization Reload Test");
+        console.log(
+          "Before reload - privateMetadata:",
+          organization.privateMetadata,
+        );
+        console.log(
+          "Before reload - publicMetadata:",
+          organization.publicMetadata,
+        );
 
         try {
-          console.log('Calling organization.reload()...');
+          console.log("Calling organization.reload()...");
           await organization.reload();
-          console.log('Reload successful');
-          console.log('After reload - privateMetadata:', organization.privateMetadata);
-          console.log('After reload - publicMetadata:', organization.publicMetadata);
+          console.log("Reload successful");
+          console.log(
+            "After reload - privateMetadata:",
+            organization.privateMetadata,
+          );
+          console.log(
+            "After reload - publicMetadata:",
+            organization.publicMetadata,
+          );
         } catch (err) {
-          console.error('Reload failed:', err);
+          console.error("Reload failed:", err);
         }
 
         console.groupEnd();
       },
       rescueMetadata: async (schoolId: string) => {
-        console.group('🚨 RESCUE MODE: Fixing metadata');
+        console.group("🚨 RESCUE MODE: Fixing metadata");
 
         if (!schoolId) {
-          console.error('No schoolId provided for rescue operation');
+          console.error("No schoolId provided for rescue operation");
           console.groupEnd();
-          return { success: false, error: 'No schoolId provided' };
+          return { success: false, error: "No schoolId provided" };
         }
 
-        console.log('Attempting to update organization metadata with direct API call');
-        console.log('Organization ID:', organization.id);
-        console.log('SchoolId to set:', schoolId);
+        console.log(
+          "Attempting to update organization metadata with direct API call",
+        );
+        console.log("Organization ID:", organization.id);
+        console.log("SchoolId to set:", schoolId);
 
         try {
           const currentPrivateMetadata = organization.privateMetadata || {};
           const currentPublicMetadata = organization.publicMetadata || {};
 
-          const { data, error } = await supabase.functions.invoke('update-organization-metadata', {
-            body: {
-              organizationId: organization.id,
-              privateMetadata: {
-                ...currentPrivateMetadata,
-                schoolId: schoolId
+          const { data, error } = await supabase.functions.invoke(
+            "update-organization-metadata",
+            {
+              body: {
+                organizationId: organization.id,
+                privateMetadata: {
+                  ...currentPrivateMetadata,
+                  schoolId: schoolId,
+                },
+                publicMetadata: currentPublicMetadata,
+                operation: "rescue",
               },
-              publicMetadata: currentPublicMetadata,
-              operation: 'rescue'
-            }
-          });
+            },
+          );
 
           if (error) {
-            console.error('Rescue operation failed:', error);
+            console.error("Rescue operation failed:", error);
             console.groupEnd();
             return { success: false, error };
           }
 
-          console.log('Rescue operation response:', data);
+          console.log("Rescue operation response:", data);
 
           await organization.reload();
 
-          console.log('After rescue - privateMetadata:', organization.privateMetadata);
-          console.log('After rescue - publicMetadata:', organization.publicMetadata);
+          console.log(
+            "After rescue - privateMetadata:",
+            organization.privateMetadata,
+          );
+          console.log(
+            "After rescue - publicMetadata:",
+            organization.publicMetadata,
+          );
 
           const success = !!organization.privateMetadata?.schoolId;
           if (success) {
-            console.log('✅ Rescue operation successful! SchoolId is now available in privateMetadata');
+            console.log(
+              "✅ Rescue operation successful! SchoolId is now available in privateMetadata",
+            );
           } else {
-            console.error('❌ Rescue operation failed - schoolId still not available in privateMetadata');
+            console.error(
+              "❌ Rescue operation failed - schoolId still not available in privateMetadata",
+            );
           }
 
           console.groupEnd();
           return { success, data };
         } catch (err) {
-          console.error('Rescue operation error:', err);
+          console.error("Rescue operation error:", err);
           console.groupEnd();
           return { success: false, error: err };
         }
-      }
+      },
     };
-    console.info('🛠️ Diagnostic tools available. Try window.__diagnoseClerData.inspectOrg() to inspect, window.__diagnoseClerData.testReload() to test reload, or window.__diagnoseClerData.rescueMetadata("your-school-id") to fix metadata.');
+    console.info(
+      '🛠️ Diagnostic tools available. Try window.__diagnoseClerData.inspectOrg() to inspect, window.__diagnoseClerData.testReload() to test reload, or window.__diagnoseClerData.rescueMetadata("your-school-id") to fix metadata.',
+    );
   } catch (err) {
-    console.error('Failed to set up diagnostic tools:', err);
+    console.error("Failed to set up diagnostic tools:", err);
   }
 };
 
@@ -158,15 +234,19 @@ interface TeacherInviteModalProps {
   onSuccess?: () => void;
 }
 
-const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const [email, setEmail] = useState('');
+const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+}) => {
+  const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isVerifyingOrganization, setIsVerifyingOrganization] = useState(false);
   const [verificationAttempts, setVerificationAttempts] = useState(0);
   const [orgLoadAttempts, setOrgLoadAttempts] = useState(0);
   const { organization: clerkOrg, isLoaded: orgIsLoaded } = useOrganization();
   const organization = clerkOrg as unknown as ExtendedOrganizationResource;
-  const { setActive } = useOrganizationList()
+  const { setActive } = useOrganizationList();
 
   const { user, isLoaded: userIsLoaded } = useUser();
   const clerk = useClerk();
@@ -174,12 +254,18 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
 
   useEffect(() => {
     const setActiveOrganization = async () => {
-      if (user?.organizationMemberships?.length > 0 && !clerkOrg && orgIsLoaded) {
+      if (
+        user?.organizationMemberships?.length > 0 &&
+        !clerkOrg &&
+        orgIsLoaded
+      ) {
         try {
-          debugLog('Setting active organization from user memberships');
-          await setActive({ organization: user.organizationMemberships[0].organization.id });
+          debugLog("Setting active organization from user memberships");
+          await setActive({
+            organization: user.organizationMemberships[0].organization.id,
+          });
         } catch (err) {
-          errorLog('Failed to set active organization', err);
+          errorLog("Failed to set active organization", err);
         }
       }
     };
@@ -187,8 +273,8 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
     setActiveOrganization();
   }, [user?.organizationMemberships, clerkOrg, orgIsLoaded, setActive]);
 
-
   const isMounted = React.useRef(false);
+  const metadataRestorationAttempted = React.useRef(false);
 
   useEffect(() => {
     isMounted.current = true;
@@ -196,19 +282,25 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
     if (isOpen && orgIsLoaded && !organization && orgLoadAttempts < 3) {
       const attemptOrgReload = async () => {
         try {
-          debugLog(`Attempting to reload organization (attempt ${orgLoadAttempts + 1})`);
+          debugLog(
+            `Attempting to reload organization (attempt ${orgLoadAttempts + 1})`,
+          );
           // Fixed: Safely check for clerk.client and client.organization before accessing methods
           const clerkClient = clerk?.client;
-          if (clerkClient && 'organization' in clerkClient && clerkClient.organization) {
+          if (
+            clerkClient &&
+            "organization" in clerkClient &&
+            clerkClient.organization
+          ) {
             await clerkClient.organization.reload();
-            debugLog('Reloaded organization via clerk.client');
+            debugLog("Reloaded organization via clerk.client");
           }
 
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise((resolve) => setTimeout(resolve, 1000));
 
-          setOrgLoadAttempts(prev => prev + 1);
+          setOrgLoadAttempts((prev) => prev + 1);
         } catch (err) {
-          errorLog('Error reloading organization', err);
+          errorLog("Error reloading organization", err);
         }
       };
 
@@ -216,7 +308,10 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
     }
 
     if (orgIsLoaded && userIsLoaded && !organization) {
-      errorLog('Organization loaded but is null/undefined', { orgIsLoaded, userIsLoaded });
+      errorLog("Organization loaded but is null/undefined", {
+        orgIsLoaded,
+        userIsLoaded,
+      });
     }
 
     return () => {
@@ -230,14 +325,14 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
     if (organization.id) return organization.id;
 
     try {
-      const idFromBracket = organization['id'];
+      const idFromBracket = organization["id"];
       if (idFromBracket) return idFromBracket;
 
-      const idFromReflect = Reflect.get(organization, 'id');
+      const idFromReflect = Reflect.get(organization, "id");
       if (idFromReflect) return idFromReflect;
 
       const keys = Object.keys(organization);
-      if (keys.includes('id')) {
+      if (keys.includes("id")) {
         return organization.id;
       }
 
@@ -246,7 +341,7 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
         return serialized.id;
       }
     } catch (err) {
-      console.error('Error trying to get organization ID:', err);
+      console.error("Error trying to get organization ID:", err);
     }
 
     return null;
@@ -257,84 +352,134 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
   useEffect(() => {
     const effectiveOrg = getEffectiveOrg();
 
-    if (effectiveOrg) {
-      setupGlobalDiagnosticTool(effectiveOrg);
+    if (effectiveOrg && isMounted.current && isOpen) {
+      // Only set up diagnostic tools in development environment
+      if (import.meta.env.DEV) {
+        setupGlobalDiagnosticTool(effectiveOrg);
+        setupClerkDiagnostics(effectiveOrg);
+      }
 
-      setupClerkDiagnostics(effectiveOrg);
+      // Only attempt metadata restoration once per component lifecycle
+      if (!metadataRestorationAttempted.current) {
+        diagnoseClerkOrganization(effectiveOrg)
+          .then((result) => {
+            if (result.success) {
+              debugLog("Organization diagnosis report:", result.report);
 
-      diagnoseClerkOrganization(effectiveOrg)
-        .then(result => {
-          if (result.success) {
-            debugLog('Organization diagnosis report:', result.report);
+              if (
+                !result.report.metadata.schoolIdLocation &&
+                isMounted.current
+              ) {
+                errorLog(
+                  "❌ SchoolId is missing from both metadata locations!",
+                );
 
-            if (!result.report.metadata.schoolIdLocation) {
-              errorLog('❌ SchoolId is missing from both metadata locations!');
-
-              if (result.report.organizationId) {
-                tryRestoreSchoolIdMetadata(result.report.organizationId);
+                if (result.report.organizationId) {
+                  metadataRestorationAttempted.current = true;
+                  tryRestoreSchoolIdMetadata(result.report.organizationId);
+                }
               }
+            } else {
+              errorLog("Failed to run organization diagnosis:", result.error);
             }
-          } else {
-            errorLog('Failed to run organization diagnosis:', result.error);
-          }
-        })
-        .catch(err => {
-          errorLog('Error running organization diagnosis:', err);
-        });
+          })
+          .catch((err) => {
+            errorLog("Error running organization diagnosis:", err);
+          });
+      }
     }
-  }, [organization]);
+
+    return () => {
+      // Clear the restoration attempt flag when component unmounts
+      if (!isOpen) {
+        metadataRestorationAttempted.current = false;
+      }
+    };
+  }, [organization, isOpen]); // Added isOpen to dependencies
 
   const tryRestoreSchoolIdMetadata = async (organizationId: string) => {
     try {
-      debugLog('Attempting to restore missing schoolId metadata');
+      // Guard against unmounted component
+      if (!isMounted.current) {
+        debugLog("Skipping metadata restoration - component not mounted");
+        return;
+      }
+
+      debugLog("Attempting to restore missing schoolId metadata");
 
       const { data: orgData, error: orgError } = await supabase
-        .from('organizations')
-        .select('school_id')
-        .eq('clerk_org_id', organizationId)
+        .from("organizations")
+        .select("school_id")
+        .eq("clerk_org_id", organizationId)
         .maybeSingle();
 
       if (orgError) {
-        errorLog('Error fetching schoolId from database:', orgError);
+        errorLog("Error fetching schoolId from database:", orgError);
+        return;
+      }
+
+      // Guard against unmounted component again after async operation
+      if (!isMounted.current) {
+        debugLog(
+          "Skipping metadata restoration after DB query - component not mounted",
+        );
         return;
       }
 
       if (orgData?.school_id) {
-        debugLog('Found schoolId in database:', orgData.school_id);
+        debugLog("Found schoolId in database:", orgData.school_id);
 
-        const { data, error } = await supabase.functions.invoke('fix-organization-metadata', {
-          body: {
-            organizationId,
-            schoolId: orgData.school_id,
-            operation: 'restore'
-          }
-        });
+        const { data, error } = await supabase.functions.invoke(
+          "fix-organization-metadata",
+          {
+            body: {
+              organizationId,
+              schoolId: orgData.school_id,
+              operation: "restore",
+            },
+          },
+        );
+
+        // Guard against unmounted component again after edge function call
+        if (!isMounted.current) {
+          debugLog(
+            "Skipping metadata reload after fix - component not mounted",
+          );
+          return;
+        }
 
         if (error) {
-          errorLog('Error restoring schoolId metadata:', error);
+          errorLog("Error restoring schoolId metadata:", error);
         } else {
-          debugLog('Metadata restoration response:', data);
+          debugLog("Metadata restoration response:", data);
 
           if (data?.success) {
             if (organization?.reload) {
-              await organization.reload();
-              debugLog('Organization reloaded after metadata fix');
+              try {
+                await organization.reload();
+                debugLog("Organization reloaded after metadata fix");
+              } catch (reloadErr) {
+                errorLog(
+                  "Error reloading organization after metadata fix:",
+                  reloadErr,
+                );
+              }
             }
           }
         }
       } else {
-        debugLog('No schoolId found in database for this organization');
+        debugLog("No schoolId found in database for this organization");
       }
     } catch (err) {
-      errorLog('Error in tryRestoreSchoolIdMetadata:', err);
+      errorLog("Error in tryRestoreSchoolIdMetadata:", err);
     }
   };
 
   useEffect(() => {
     const effectiveOrg = getEffectiveOrg();
-    debugLog('Component mounted with organization:', effectiveOrg?.id);
+    debugLog("Component mounted with organization:", effectiveOrg?.id);
     return () => {
-      debugLog('Component unmounted');
+      debugLog("Component unmounted");
     };
   }, [organization]);
 
@@ -348,62 +493,89 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
   useEffect(() => {
     const effectiveOrg = getEffectiveOrg();
     if (isOpen && effectiveOrg?.id && verificationAttempts === 0) {
-      console.log('Modal opened with organization, triggering verification -', isOpen, verificationAttempts, orgIsLoaded, userIsLoaded);
-      debugLog('Modal opened with organization, triggering verification', effectiveOrg.id);
-      verifyOrganizationSetup();
+      // Add a small delay before verification to ensure all Clerk data is loaded
+      // This helps prevent race conditions where verification starts before Clerk is fully initialized
+      const verificationTimer = setTimeout(() => {
+        console.log(
+          "Modal opened with organization, triggering verification -",
+          isOpen,
+          verificationAttempts,
+          orgIsLoaded,
+          userIsLoaded,
+        );
+        debugLog(
+          "Modal opened with organization, triggering verification",
+          effectiveOrg.id,
+        );
+        verifyOrganizationSetup();
+      }, 500); // Short delay to ensure Clerk data is fully loaded
+
+      return () => clearTimeout(verificationTimer);
     }
   }, [isOpen, verificationAttempts, orgIsLoaded, userIsLoaded]);
 
   useEffect(() => {
     const effectiveOrg = getEffectiveOrg();
     if (effectiveOrg) {
-      debugLog('CLERK ORGANIZATION DEBUG');
-      debugLog('Organization ID', effectiveOrg.id);
-      debugLog('Organization Type', Object.prototype.toString.call(effectiveOrg));
+      debugLog("CLERK ORGANIZATION DEBUG");
+      debugLog("Organization ID", effectiveOrg.id);
+      debugLog(
+        "Organization Type",
+        Object.prototype.toString.call(effectiveOrg),
+      );
 
       try {
-        debugLog('Organization Keys', Object.keys(effectiveOrg));
-        debugLog('Prototype Chain', Object.getPrototypeOf(effectiveOrg)?.constructor?.name);
+        debugLog("Organization Keys", Object.keys(effectiveOrg));
+        debugLog(
+          "Prototype Chain",
+          Object.getPrototypeOf(effectiveOrg)?.constructor?.name,
+        );
       } catch (err) {
-        errorLog('Error inspecting organization object', err);
+        errorLog("Error inspecting organization object", err);
       }
 
-      debugLog('Private Metadata', effectiveOrg.privateMetadata);
-      debugLog('Public Metadata', effectiveOrg.publicMetadata);
+      debugLog("Private Metadata", effectiveOrg.privateMetadata);
+      debugLog("Public Metadata", effectiveOrg.publicMetadata);
 
       try {
         // Fixed: Removed reference to _privateMetadata, use only privateMetadata
-        const privateMeta = effectiveOrg['privateMetadata'];
-        debugLog('Alternative privateMetadata access attempt', privateMeta);
+        const privateMeta = effectiveOrg["privateMetadata"];
+        debugLog("Alternative privateMetadata access attempt", privateMeta);
 
         for (const key in effectiveOrg) {
-          if (key.toLowerCase().includes('meta')) {
+          if (key.toLowerCase().includes("meta")) {
             debugLog(`Found meta-like property: ${key}`, effectiveOrg[key]);
           }
         }
       } catch (err) {
-        errorLog('Error accessing metadata through alternative means', err);
+        errorLog("Error accessing metadata through alternative means", err);
       }
 
       const hasPrivateSchoolId = !!effectiveOrg.privateMetadata?.schoolId;
       const hasPublicSchoolId = !!effectiveOrg.publicMetadata?.schoolId;
 
-      debugLog('Metadata Status', {
+      debugLog("Metadata Status", {
         hasPrivateSchoolId,
         hasPublicSchoolId,
         privateSchoolId: effectiveOrg.privateMetadata?.schoolId,
-        publicSchoolId: effectiveOrg.publicMetadata?.schoolId
+        publicSchoolId: effectiveOrg.publicMetadata?.schoolId,
       });
 
       if (hasPrivateSchoolId) {
-        debugLog('✅ Organization has correct metadata structure (privateMetadata.schoolId)');
+        debugLog(
+          "✅ Organization has correct metadata structure (privateMetadata.schoolId)",
+        );
       } else if (hasPublicSchoolId) {
-        debugLog('⚠️ Organization has legacy metadata structure (publicMetadata.schoolId)');
+        debugLog(
+          "⚠️ Organization has legacy metadata structure (publicMetadata.schoolId)",
+        );
       } else {
-        errorLog('❌ Organization is missing schoolId in both metadata locations!');
+        errorLog(
+          "❌ Organization is missing schoolId in both metadata locations!",
+        );
       }
     } else {
-      errorLog('Organization is not available yet', { orgIsLoaded });
+      errorLog("Organization is not available yet", { orgIsLoaded });
     }
   }, [organization, orgIsLoaded, userIsLoaded]);
 
@@ -411,79 +583,178 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
     const effectiveOrg = getEffectiveOrg();
 
     if (!effectiveOrg?.id || !user?.id) {
-      debugLog('Missing organization or user ID for verification', {
+      debugLog("Missing organization or user ID for verification", {
         organizationId: effectiveOrg?.id,
-        userId: user?.id
+        userId: user?.id,
       });
       return;
     }
 
     try {
       setIsVerifyingOrganization(true);
-      debugLog('Starting organization verification process');
+      debugLog("Starting organization verification process");
 
+      // First check if the user is already an admin using a direct API call
+      // This avoids the retry loop if the user is already properly set up
+      try {
+        debugLog(
+          "Performing direct membership check before verification attempts",
+        );
+        const directCheckResponse = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-admin-membership`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            },
+            body: JSON.stringify({
+              organizationId: effectiveOrg.id,
+              userId: user.id,
+              requestId: `direct_check_${Math.random().toString(36).substring(2, 10)}`,
+            }),
+          },
+        );
+
+        if (directCheckResponse.ok) {
+          const membershipData = await directCheckResponse.json();
+          debugLog("Direct membership check result:", membershipData);
+
+          if (membershipData.success && membershipData.isAdmin) {
+            debugLog("User is already an admin, skipping verification process");
+
+            // Still reload the organization to ensure metadata is up to date
+            try {
+              await effectiveOrg.reload();
+              debugLog("Organization reloaded after confirming admin status");
+            } catch (reloadError) {
+              debugLog(
+                "Non-critical error reloading organization:",
+                reloadError,
+              );
+            }
+
+            setIsVerifyingOrganization(false);
+            return;
+          }
+        }
+      } catch (directCheckError) {
+        debugLog(
+          "Error during direct membership check, continuing with standard verification:",
+          directCheckError,
+        );
+      }
+
+      // Proceed with standard verification if direct check didn't confirm admin status
       const verificationSucceeded = await verifyOrganizationAdminWithRetry(
         effectiveOrg.id,
         user.id,
-        3
+        2, // Reduced attempts to minimize waiting
       );
 
       if (verificationSucceeded) {
-        debugLog('Organization verification succeeded, reloading organization data');
+        debugLog(
+          "Organization verification succeeded, reloading organization data",
+        );
 
         const beforeReload = {
           privateMetadata: JSON.stringify(effectiveOrg.privateMetadata),
-          publicMetadata: JSON.stringify(effectiveOrg.publicMetadata)
+          publicMetadata: JSON.stringify(effectiveOrg.publicMetadata),
         };
 
-        debugLog('Organization data before reload', beforeReload);
+        debugLog("Organization data before reload", beforeReload);
 
         const reloadStart = performance.now();
         await effectiveOrg.reload();
         const reloadEnd = performance.now();
 
-        debugLog(`Organization reload completed in ${Math.round(reloadEnd - reloadStart)}ms`);
+        debugLog(
+          `Organization reload completed in ${Math.round(reloadEnd - reloadStart)}ms`,
+        );
 
         const afterReload = {
           privateMetadata: JSON.stringify(effectiveOrg.privateMetadata),
-          publicMetadata: JSON.stringify(effectiveOrg.publicMetadata)
+          publicMetadata: JSON.stringify(effectiveOrg.publicMetadata),
         };
 
-        debugLog('Organization data after reload', afterReload);
-        debugLog('Metadata changed during reload', {
-          privateMetadataChanged: beforeReload.privateMetadata !== afterReload.privateMetadata,
-          publicMetadataChanged: beforeReload.publicMetadata !== afterReload.publicMetadata
+        debugLog("Organization data after reload", afterReload);
+        debugLog("Metadata changed during reload", {
+          privateMetadataChanged:
+            beforeReload.privateMetadata !== afterReload.privateMetadata,
+          publicMetadataChanged:
+            beforeReload.publicMetadata !== afterReload.publicMetadata,
         });
 
         toast({
-          title: 'Organization membership verified',
-          description: 'Your administrator access has been confirmed.',
+          title: "Organization membership verified",
+          description: "Your administrator access has been confirmed.",
         });
       } else {
-        errorLog('Organization verification failed after multiple attempts', { organization: effectiveOrg.id });
-        setVerificationAttempts(prev => prev + 1);
+        errorLog("Organization verification failed after multiple attempts", {
+          organization: effectiveOrg.id,
+        });
+        setVerificationAttempts((prev) => prev + 1);
+
+        // Try one last direct manual add as a fallback
+        try {
+          debugLog("Attempting final direct manual add as fallback");
+          const manualAddResult = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manual-add-to-organization`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              },
+              body: JSON.stringify({
+                organizationId: effectiveOrg.id,
+                userId: user.id,
+                role: "org:admin",
+                requestId: `final_fallback_${Math.random().toString(36).substring(2, 10)}`,
+              }),
+            },
+          );
+
+          if (manualAddResult.ok) {
+            const result = await manualAddResult.json();
+            if (result.success) {
+              debugLog("Final fallback manual add succeeded");
+              await effectiveOrg.reload();
+              toast({
+                title: "Organization access confirmed",
+                description: "Your administrator access has been verified.",
+              });
+              setIsVerifyingOrganization(false);
+              return;
+            }
+          }
+        } catch (fallbackError) {
+          debugLog("Final fallback attempt failed:", fallbackError);
+        }
 
         if (verificationAttempts >= 2) {
           toast({
-            title: 'Organization setup issue',
-            description: 'There was a problem verifying your organization access. Please try refreshing the page.',
-            variant: 'destructive',
+            title: "Organization setup issue",
+            description:
+              "There was a problem verifying your organization access. Please try refreshing the page.",
+            variant: "destructive",
           });
         } else {
           setTimeout(() => {
             setVerificationAttempts(0);
-          }, 5000);
+          }, 3000); // Reduced timeout
         }
       }
     } catch (error) {
-      errorLog('Exception during organization verification', error);
-      setVerificationAttempts(prev => prev + 1);
+      errorLog("Exception during organization verification", error);
+      setVerificationAttempts((prev) => prev + 1);
 
       if (verificationAttempts >= 2) {
         toast({
-          title: 'Organization setup issue',
-          description: 'There was a problem verifying your organization access. Please refresh and try again.',
-          variant: 'destructive',
+          title: "Organization setup issue",
+          description:
+            "There was a problem verifying your organization access. Please refresh and try again.",
+          variant: "destructive",
         });
       }
     } finally {
@@ -494,13 +765,13 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    debugLog('Invitation form submitted', { email });
+    debugLog("Invitation form submitted", { email });
 
     if (!email) {
-      debugLog('Email address is empty');
+      debugLog("Email address is empty");
       toast({
-        title: 'Please enter an email address',
-        variant: 'destructive',
+        title: "Please enter an email address",
+        variant: "destructive",
       });
       return;
     }
@@ -509,18 +780,20 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
     const orgId = getOrganizationId();
 
     if (!orgId) {
-      errorLog('Organization not found', {
+      errorLog("Organization not found", {
         orgIsLoaded,
         userIsLoaded,
-        organization: effectiveOrg ? {
-          id: effectiveOrg.id,
-          hasId: !!effectiveOrg.id,
-          constructor: effectiveOrg?.constructor?.name,
-          type: typeof effectiveOrg,
-          privateMetadata: effectiveOrg.privateMetadata,
-          publicMetadata: effectiveOrg.publicMetadata,
-          keys: Object.keys(effectiveOrg)
-        } : 'null'
+        organization: effectiveOrg
+          ? {
+              id: effectiveOrg.id,
+              hasId: !!effectiveOrg.id,
+              constructor: effectiveOrg?.constructor?.name,
+              type: typeof effectiveOrg,
+              privateMetadata: effectiveOrg.privateMetadata,
+              publicMetadata: effectiveOrg.publicMetadata,
+              keys: Object.keys(effectiveOrg),
+            }
+          : "null",
       });
 
       let alternateOrgId = null;
@@ -528,23 +801,34 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
       try {
         // Fixed: Safely check for clerk.client and client.organization before accessing its id
         const clerkClient = clerk?.client;
-        if (clerkClient && 'organization' in clerkClient && clerkClient.organization) {
+        if (
+          clerkClient &&
+          "organization" in clerkClient &&
+          clerkClient.organization
+        ) {
           alternateOrgId = clerkClient.organization.id;
-          debugLog('Retrieved alternate organization ID from clerk.client:', alternateOrgId);
+          debugLog(
+            "Retrieved alternate organization ID from clerk.client:",
+            alternateOrgId,
+          );
         }
       } catch (err) {
-        errorLog('Error retrieving alternate organization ID:', err);
+        errorLog("Error retrieving alternate organization ID:", err);
       }
 
       if (alternateOrgId) {
-        debugLog('Using alternate organization ID for invitation:', alternateOrgId);
+        debugLog(
+          "Using alternate organization ID for invitation:",
+          alternateOrgId,
+        );
         return processInvitation(alternateOrgId);
       }
 
       toast({
-        title: 'Organization not found',
-        description: 'Unable to send invitation. Please refresh the page and try again.',
-        variant: 'destructive',
+        title: "Organization not found",
+        description:
+          "Unable to send invitation. Please refresh the page and try again.",
+        variant: "destructive",
       });
       return;
     }
@@ -558,162 +842,185 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
     let schoolId = null;
 
     if (effectiveOrg) {
-      schoolId = effectiveOrg.privateMetadata?.schoolId || effectiveOrg.publicMetadata?.schoolId;
+      schoolId =
+        effectiveOrg.privateMetadata?.schoolId ||
+        effectiveOrg.publicMetadata?.schoolId;
     }
 
     if (!schoolId) {
       try {
-        debugLog('No schoolId found in organization metadata, checking database');
+        debugLog(
+          "No schoolId found in organization metadata, checking database",
+        );
 
         const { data: orgData, error: orgError } = await supabase
-          .from('organizations')
-          .select('school_id')
-          .eq('clerk_org_id', organizationId)
+          .from("organizations")
+          .select("school_id")
+          .eq("clerk_org_id", organizationId)
           .maybeSingle();
 
         if (orgError) {
-          errorLog('Error fetching schoolId from database:', orgError);
+          errorLog("Error fetching schoolId from database:", orgError);
         } else if (orgData?.school_id) {
           schoolId = orgData.school_id;
-          debugLog('Found schoolId in database:', schoolId);
+          debugLog("Found schoolId in database:", schoolId);
         }
 
         if (!schoolId && user?.id) {
           const { data: profileData } = await supabase
-            .from('profiles')
-            .select('school_id')
-            .eq('id', user.id)
+            .from("profiles")
+            .select("school_id")
+            .eq("id", user.id)
             .maybeSingle();
 
           if (profileData?.school_id) {
             schoolId = profileData.school_id;
-            debugLog('Found schoolId in profile:', schoolId);
+            debugLog("Found schoolId in profile:", schoolId);
           }
         }
       } catch (err) {
-        errorLog('Error retrieving schoolId from database:', err);
+        errorLog("Error retrieving schoolId from database:", err);
       }
     }
 
-    debugLog('Invitation metadata diagnosis', {
+    debugLog("Invitation metadata diagnosis", {
       organizationId,
       schoolId,
       privateMetadata: effectiveOrg?.privateMetadata,
-      publicMetadata: effectiveOrg?.publicMetadata
+      publicMetadata: effectiveOrg?.publicMetadata,
     });
 
     if (!schoolId) {
-      errorLog('Missing schoolId in both metadata locations and database');
+      errorLog("Missing schoolId in both metadata locations and database");
       toast({
-        title: 'Missing school information',
-        description: 'Unable to determine your school. Please contact support or try refreshing the page.',
-        variant: 'destructive',
+        title: "Missing school information",
+        description:
+          "Unable to determine your school. Please contact support or try refreshing the page.",
+        variant: "destructive",
       });
       return;
     }
 
     setIsLoading(true);
-    debugLog('Starting invitation process', { email, schoolId, organizationId });
+    debugLog("Starting invitation process", {
+      email,
+      schoolId,
+      organizationId,
+    });
 
     try {
-      const { data: subscriptionData, error: subscriptionError } = await supabase
-        .from('subscriptions')
-        .select('total_teacher_seats, used_teacher_seats')
-        .eq('school_id', schoolId as string)
-        .maybeSingle();
+      const { data: subscriptionData, error: subscriptionError } =
+        await supabase
+          .from("subscriptions")
+          .select("total_teacher_seats, used_teacher_seats")
+          .eq("school_id", schoolId as string)
+          .maybeSingle();
 
       if (subscriptionError) {
-        errorLog('Subscription check failed', { subscriptionError, schoolId });
-        throw new Error(`Subscription check failed: ${subscriptionError.message}`);
+        errorLog("Subscription check failed", { subscriptionError, schoolId });
+        throw new Error(
+          `Subscription check failed: ${subscriptionError.message}`,
+        );
       }
 
       if (!subscriptionData) {
-        errorLog('No subscription found for school ID', { schoolId });
-        throw new Error('No subscription found for this school');
+        errorLog("No subscription found for school ID", { schoolId });
+        throw new Error("No subscription found for this school");
       }
 
-      debugLog('Subscription found', {
+      debugLog("Subscription found", {
         totalSeats: subscriptionData.total_teacher_seats,
         usedSeats: subscriptionData.used_teacher_seats,
-        availableSeats: subscriptionData.total_teacher_seats - subscriptionData.used_teacher_seats
+        availableSeats:
+          subscriptionData.total_teacher_seats -
+          subscriptionData.used_teacher_seats,
       });
 
-      if (subscriptionData.used_teacher_seats >= subscriptionData.total_teacher_seats) {
-        errorLog('Teacher seat limit reached', {
+      if (
+        subscriptionData.used_teacher_seats >=
+        subscriptionData.total_teacher_seats
+      ) {
+        errorLog("Teacher seat limit reached", {
           totalSeats: subscriptionData.total_teacher_seats,
-          usedSeats: subscriptionData.used_teacher_seats
+          usedSeats: subscriptionData.used_teacher_seats,
         });
-        throw new Error('You have reached your teacher seat limit. Please upgrade your subscription to add more teachers.');
+        throw new Error(
+          "You have reached your teacher seat limit. Please upgrade your subscription to add more teachers.",
+        );
       }
 
       try {
-        debugLog('Invoking invite-teacher edge function', {
+        debugLog("Invoking invite-teacher edge function", {
           organizationId,
           emailAddress: email,
-          schoolId
+          schoolId,
         });
 
         const inviteStartTime = performance.now();
-        const { data: inviteData, error: inviteError } = await supabase.functions.invoke('invite-teacher', {
-          body: {
-            organizationId,
-            emailAddress: email,
-            schoolId
-          },
-        });
+        const { data: inviteData, error: inviteError } =
+          await supabase.functions.invoke("invite-teacher", {
+            body: {
+              organizationId,
+              emailAddress: email,
+              schoolId,
+            },
+          });
         const inviteEndTime = performance.now();
 
-        debugLog(`Edge function completed in ${Math.round(inviteEndTime - inviteStartTime)}ms`);
-        debugLog('Response data from edge function', inviteData);
+        debugLog(
+          `Edge function completed in ${Math.round(inviteEndTime - inviteStartTime)}ms`,
+        );
+        debugLog("Response data from edge function", inviteData);
 
         if (inviteError) {
-          errorLog('Error from invite-teacher function', inviteError);
+          errorLog("Error from invite-teacher function", inviteError);
           throw new Error(`Failed to send invitation: ${inviteError.message}`);
         }
 
         if (!inviteData?.success) {
-          errorLog('Invitation not successful', {
+          errorLog("Invitation not successful", {
             response: inviteData,
-            details: inviteData?.details
+            details: inviteData?.details,
           });
           throw new Error(inviteData?.message || "Failed to send invitation");
         }
 
-        debugLog('Invitation sent successfully', inviteData);
+        debugLog("Invitation sent successfully", inviteData);
 
         const { error: updateError } = await supabase
-          .from('subscriptions')
+          .from("subscriptions")
           .update({
-            used_teacher_seats: subscriptionData.used_teacher_seats + 1
+            used_teacher_seats: subscriptionData.used_teacher_seats + 1,
           })
-          .eq('school_id', schoolId as string);
+          .eq("school_id", schoolId as string);
 
         if (updateError) {
-          errorLog('Failed to update seat count', updateError);
+          errorLog("Failed to update seat count", updateError);
           // Continue anyway as the webhook should eventually reconcile
         } else {
-          debugLog('Teacher seat count updated successfully');
+          debugLog("Teacher seat count updated successfully");
         }
 
-        debugLog('Invitation process completed successfully');
+        debugLog("Invitation process completed successfully");
         toast({
-          title: 'Invitation sent',
+          title: "Invitation sent",
           description: `${email} has been invited to join as a teacher`,
         });
 
-        setEmail('');
+        setEmail("");
         onSuccess?.();
         onClose();
       } catch (error: any) {
-        errorLog('Exception during invitation process', error);
+        errorLog("Exception during invitation process", error);
         throw error;
       }
     } catch (error: any) {
-      errorLog('Teacher invitation error', error);
+      errorLog("Teacher invitation error", error);
       toast({
-        title: 'Invitation failed',
-        description: error.message || 'Failed to send invitation. Please try again.',
-        variant: 'destructive',
+        title: "Invitation failed",
+        description:
+          error.message || "Failed to send invitation. Please try again.",
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
@@ -737,21 +1044,19 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
 
   const effectiveOrg = getEffectiveOrg();
 
-  if ((orgIsLoaded && userIsLoaded) && !effectiveOrg) {
+  if (orgIsLoaded && userIsLoaded && !effectiveOrg) {
     return (
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Organization Unavailable</DialogTitle>
             <DialogDescription>
-              Unable to load your organization data. This might be a temporary issue.
+              Unable to load your organization data. This might be a temporary
+              issue.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-center py-4">
-            <Button
-              onClick={() => window.location.reload()}
-              className="mt-2"
-            >
+            <Button onClick={() => window.location.reload()} className="mt-2">
               Refresh Page
             </Button>
           </div>
@@ -774,16 +1079,24 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
           <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
             <div className="flex">
               <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                <svg
+                  className="h-5 w-5 text-yellow-400"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z"
+                    clipRule="evenodd"
+                  />
                 </svg>
               </div>
               <div className="ml-3">
                 <p className="text-sm text-yellow-700">
-                  {effectiveOrg.publicMetadata?.schoolId ?
-                    "Organization is using legacy metadata structure. This will work, but should be updated." :
-                    "Organization is missing required metadata. Teacher invitations might fail."
-                  }
+                  {effectiveOrg.publicMetadata?.schoolId
+                    ? "Organization is using legacy metadata structure. This will work, but should be updated."
+                    : "Organization is missing required metadata. Teacher invitations might fail."}
                 </p>
               </div>
             </div>
@@ -820,10 +1133,10 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({ isOpen, onClose
               disabled={isLoading || isVerifyingOrganization}
             >
               {isVerifyingOrganization
-                ? 'Verifying access...'
+                ? "Verifying access..."
                 : isLoading
-                  ? 'Sending...'
-                  : 'Send Invitation'}
+                  ? "Sending..."
+                  : "Send Invitation"}
             </Button>
           </DialogFooter>
         </form>
