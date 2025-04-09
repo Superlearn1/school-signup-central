@@ -12,6 +12,7 @@ import Subscription from "./pages/Subscription";
 import Dashboard from "./pages/Dashboard";
 import StudentManagement from "./pages/StudentManagement";
 import RecoveryTool from "./pages/admin/RecoveryTool";
+import SubscriptionSuccess from "./pages/SubscriptionSuccess";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import ClerkDebugger from "@/utils/clerk-debug";
@@ -99,6 +100,7 @@ const App = () => {
                   </ProtectedRoute>
                 } 
               />
+              <Route path="/subscription/success" element={<SubscriptionSuccess />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

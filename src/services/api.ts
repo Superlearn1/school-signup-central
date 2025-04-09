@@ -322,3 +322,22 @@ export const createResource = async (resource: Omit<Resource, 'id' | 'created_at
 
   return data[0] as Resource;
 };
+
+export const updateResource = async (resourceId: string, updates: Partial<Resource>): Promise<Resource> => {
+  const { data, error } = await supabase
+    .from('resources')
+    .update(updates)
+    .eq('id', resourceId)
+    .select();
+
+  if (error) {
+    console.error('Error updating resource:', error);
+    throw error;
+  }
+
+  if (!data || data.length === 0) {
+    throw new Error('Failed to update resource');
+  }
+
+  return data[0] as Resource;
+};
