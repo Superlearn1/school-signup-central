@@ -285,7 +285,6 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({
           debugLog(
             `Attempting to reload organization (attempt ${orgLoadAttempts + 1})`,
           );
-          // Fixed: Safely check for clerk.client and client.organization before accessing methods
           const clerkClient = clerk?.client;
           if (
             clerkClient &&
@@ -353,13 +352,11 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({
     const effectiveOrg = getEffectiveOrg();
 
     if (effectiveOrg && isMounted.current && isOpen) {
-      // Only set up diagnostic tools in development environment
       if (import.meta.env.DEV) {
         setupGlobalDiagnosticTool(effectiveOrg);
         setupClerkDiagnostics(effectiveOrg);
       }
 
-      // Only attempt metadata restoration once per component lifecycle
       if (!metadataRestorationAttempted.current) {
         diagnoseClerkOrganization(effectiveOrg)
           .then((result) => {
@@ -390,16 +387,14 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({
     }
 
     return () => {
-      // Clear the restoration attempt flag when component unmounts
       if (!isOpen) {
         metadataRestorationAttempted.current = false;
       }
     };
-  }, [organization, isOpen]); // Added isOpen to dependencies
+  }, [organization, isOpen]);
 
   const tryRestoreSchoolIdMetadata = async (organizationId: string) => {
     try {
-      // Guard against unmounted component
       if (!isMounted.current) {
         debugLog("Skipping metadata restoration - component not mounted");
         return;
@@ -418,7 +413,6 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({
         return;
       }
 
-      // Guard against unmounted component again after async operation
       if (!isMounted.current) {
         debugLog(
           "Skipping metadata restoration after DB query - component not mounted",
@@ -440,7 +434,6 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({
           },
         );
 
-        // Guard against unmounted component again after edge function call
         if (!isMounted.current) {
           debugLog(
             "Skipping metadata reload after fix - component not mounted",
@@ -493,8 +486,6 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({
   useEffect(() => {
     const effectiveOrg = getEffectiveOrg();
     if (isOpen && effectiveOrg?.id && verificationAttempts === 0) {
-      // Add a small delay before verification to ensure all Clerk data is loaded
-      // This helps prevent race conditions where verification starts before Clerk is fully initialized
       const verificationTimer = setTimeout(() => {
         console.log(
           "Modal opened with organization, triggering verification -",
@@ -508,7 +499,7 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({
           effectiveOrg.id,
         );
         verifyOrganizationSetup();
-      }, 500); // Short delay to ensure Clerk data is fully loaded
+      }, 500);
 
       return () => clearTimeout(verificationTimer);
     }
@@ -538,7 +529,6 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({
       debugLog("Public Metadata", effectiveOrg.publicMetadata);
 
       try {
-        // Fixed: Removed reference to _privateMetadata, use only privateMetadata
         const privateMeta = effectiveOrg["privateMetadata"];
         debugLog("Alternative privateMetadata access attempt", privateMeta);
 
@@ -594,8 +584,6 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({
       setIsVerifyingOrganization(true);
       debugLog("Starting organization verification process");
 
-      // First check if the user is already an admin using a direct API call
-      // This avoids the retry loop if the user is already properly set up
       try {
         debugLog(
           "Performing direct membership check before verification attempts",
@@ -623,7 +611,6 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({
           if (membershipData.success && membershipData.isAdmin) {
             debugLog("User is already an admin, skipping verification process");
 
-            // Still reload the organization to ensure metadata is up to date
             try {
               await effectiveOrg.reload();
               debugLog("Organization reloaded after confirming admin status");
@@ -645,11 +632,10 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({
         );
       }
 
-      // Proceed with standard verification if direct check didn't confirm admin status
       const verificationSucceeded = await verifyOrganizationAdminWithRetry(
         effectiveOrg.id,
         user.id,
-        2, // Reduced attempts to minimize waiting
+        2,
       );
 
       if (verificationSucceeded) {
@@ -695,7 +681,6 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({
         });
         setVerificationAttempts((prev) => prev + 1);
 
-        // Try one last direct manual add as a fallback
         try {
           debugLog("Attempting final direct manual add as fallback");
           const manualAddResult = await fetch(
@@ -742,7 +727,7 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({
         } else {
           setTimeout(() => {
             setVerificationAttempts(0);
-          }, 3000); // Reduced timeout
+          }, 3000);
         }
       }
     } catch (error) {
@@ -799,7 +784,6 @@ const TeacherInviteModal: React.FC<TeacherInviteModalProps> = ({
       let alternateOrgId = null;
 
       try {
-        // Fixed: Safely check for clerk.client and client.organization before accessing its id
         const clerkClient = clerk?.client;
         if (
           clerkClient &&

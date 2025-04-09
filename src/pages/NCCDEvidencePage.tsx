@@ -1,172 +1,129 @@
-
 import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Search, Download, Filter } from "lucide-react";
-import NCCDEvidenceManagement from "@/components/NCCDEvidenceManagement";
-import { ResourceAdaptation, Student } from "@/types";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { CheckCircle, XCircle } from "lucide-react";
 
-// Extended interfaces for the mock data to include UI properties
+// Mock type for ResourceAdaptation
+interface ResourceAdaptation {
+  id: string;
+  resource_id: string;
+  student_id: string;
+  adaptations_made: string;
+  adapted_content: string;
+  created_at: string;
+}
+
+// First, update the ExtendedResourceAdaptation interface to include school_id
 interface ExtendedResourceAdaptation extends ResourceAdaptation {
+  studentId: string;
+  resourceId: string;
+  createdAt: string;
   adaptationSummary: string;
   markedAsEvidence: boolean;
+  adaptedContent: string;
+  school_id?: string; // Add this property
 }
 
 const NCCDEvidencePage: React.FC = () => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [studentFilter, setStudentFilter] = useState<string>("");
-
-  // Mock student data aligned with the Student interface
-  const students: Student[] = [
-    {
-      id: "student-1",
-      school_id: "school-1",
-      student_id: "S12345",
-      full_name: "John Smith",
-      disabilities: ["specific_learning_disorder"],
-      created_at: new Date().toISOString(),
-      // For UI purposes
-      first_name: "John",
-      last_name: "Smith"
-    },
-    {
-      id: "student-2",
-      school_id: "school-1",
-      student_id: "S67890",
-      full_name: "Emma Johnson",
-      disabilities: ["attention_deficit_hyperactivity_disorder"],
-      created_at: new Date().toISOString(),
-      // For UI purposes
-      first_name: "Emma",
-      last_name: "Johnson"
-    },
-  ];
-
-  // Mock adaptation data aligned with the ResourceAdaptation interface
-  const adaptations: ExtendedResourceAdaptation[] = [
+  // Mock resource adaptations data
+  const mockResourceAdaptations: ExtendedResourceAdaptation[] = [
     {
       id: "1",
-      resource_id: "resource-1",
-      student_id: "student-1",
-      adapted_content: "This is the adapted content for student 1",
-      adaptations_made: "Modified vocabulary and added visual supports",
-      created_at: new Date().toISOString(),
-      // UI-specific properties
-      adaptationSummary: "Modified vocabulary and added visual supports for a student with specific learning disorder",
-      markedAsEvidence: false,
-      school_id: "school-1",
-      created_by: "teacher-1",
+      resource_id: "r1",  // Use the correct property name
+      student_id: "s1",   // Use the correct property name
+      studentId: "S12345", // Keep for UI usage
+      resourceId: "R001", // Keep for UI usage
+      adaptations_made: "Added visual supports and simplified language",
+      adapted_content: "<div>Adapted content for John Smith...</div>",
+      adaptedContent: "<div>Adapted content for John Smith...</div>", // Keep for UI usage
+      created_at: "2023-05-20T10:30:00Z", // Use the correct property name
+      createdAt: "2023-05-20T10:30:00Z", // Keep for UI usage
+      adaptationSummary: "Added visual supports and simplified language", // UI specific
+      markedAsEvidence: false, // UI specific
+      school_id: "school_1" // Add the required property
     },
     {
       id: "2",
-      resource_id: "resource-2",
-      student_id: "student-2",
-      adapted_content: "This is the adapted content for student 2",
-      adaptations_made: "Simplified instructions and added step-by-step guide",
-      created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-      // UI-specific properties
-      adaptationSummary: "Simplified instructions and added step-by-step guide for a student with attention-deficit/hyperactivity disorder",
+      resource_id: "r2",
+      student_id: "s2",
+      studentId: "S67890",
+      resourceId: "R002",
+      adaptations_made: "Provided sentence starters and graphic organizers",
+      adapted_content: "<div>Adapted content for Emma Johnson...</div>",
+      adaptedContent: "<div>Adapted content for Emma Johnson...</div>",
+      created_at: "2023-06-15T14:45:00Z",
+      createdAt: "2023-06-15T14:45:00Z",
+      adaptationSummary: "Provided sentence starters and graphic organizers",
       markedAsEvidence: true,
-      school_id: "school-1",
-      created_by: "teacher-1",
+      school_id: "school_1"
     },
     {
       id: "3",
-      resource_id: "resource-3",
-      student_id: "student-1",
-      adapted_content: "Another adaptation for student 1",
-      adaptations_made: "Chunked content into smaller sections",
-      created_at: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
-      // UI-specific properties
-      adaptationSummary: "Chunked content into smaller sections and provided additional practice examples",
-      markedAsEvidence: true,
-      school_id: "school-1",
-      created_by: "teacher-1",
+      resource_id: "r3",
+      student_id: "s3",
+      studentId: "S24680",
+      resourceId: "R003",
+      adaptations_made: "Used simplified text and highlighted key vocabulary",
+      adapted_content: "<div>Adapted content for Michael Brown...</div>",
+      adaptedContent: "<div>Adapted content for Michael Brown...</div>",
+      created_at: "2023-07-01T09:00:00Z",
+      createdAt: "2023-07-01T09:00:00Z",
+      adaptationSummary: "Used simplified text and highlighted key vocabulary",
+      markedAsEvidence: false,
+      school_id: "school_1"
     },
   ];
 
-  // Filter adaptations based on search and student filter
-  const filteredAdaptations = adaptations.filter((adaptation) => {
-    const matchesSearch = adaptation.adaptationSummary
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    const matchesStudent = studentFilter
-      ? adaptation.student_id === studentFilter
-      : true;
-    return matchesSearch && matchesStudent;
-  });
-
-  const handleMarkAsEvidence = async (
-    adaptationId: string,
-    dateTaught: Date,
-  ) => {
-    console.log("Marking as evidence:", adaptationId, dateTaught);
-    // In a real app, this would call an API to mark the adaptation as evidence
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+  // Function to format the date
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString();
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold">NCCD Evidence Management</h2>
-        <Button variant="outline">
-          <Download className="mr-2 h-4 w-4" /> Export Evidence
-        </Button>
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search evidence..."
-            className="pl-8"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-
-        <div className="w-full sm:w-[200px]">
-          <Select value={studentFilter} onValueChange={setStudentFilter}>
-            <SelectTrigger>
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4" />
-                <SelectValue placeholder="Filter by student" />
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">All Students</SelectItem>
-              {students.map((student) => (
-                <SelectItem key={student.id} value={student.id}>
-                  {student.full_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <NCCDEvidenceManagement
-        adaptations={adaptations}
-        students={students}
-        onMarkAsEvidence={handleMarkAsEvidence}
-      />
-
-      <div className="flex justify-between items-center text-sm text-muted-foreground">
-        <div>
-          Showing {filteredAdaptations.length} of {adaptations.length}{" "}
-          adaptations
-        </div>
-        <div>
-          {adaptations.filter((a) => a.markedAsEvidence).length} items marked as
-          evidence
-        </div>
+      <h2 className="text-xl font-bold">NCCD Evidence</h2>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Student ID</TableHead>
+              <TableHead>Resource ID</TableHead>
+              <TableHead>Adaptations Made</TableHead>
+              <TableHead>Created At</TableHead>
+              <TableHead>Marked as Evidence</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {mockResourceAdaptations.map((adaptation) => (
+              <TableRow key={adaptation.id}>
+                <TableCell className="font-medium">{adaptation.studentId}</TableCell>
+                <TableCell>{adaptation.resourceId}</TableCell>
+                <TableCell>{adaptation.adaptationSummary}</TableCell>
+                <TableCell>{formatDate(adaptation.createdAt)}</TableCell>
+                <TableCell>
+                  {adaptation.markedAsEvidence ? (
+                    <Badge variant="outline">
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Yes
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary">
+                      <XCircle className="mr-2 h-4 w-4" />
+                      No
+                    </Badge>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
