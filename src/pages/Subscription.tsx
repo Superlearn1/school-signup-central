@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser, useOrganization } from '@clerk/clerk-react';
@@ -68,34 +67,29 @@ const Subscription: React.FC = () => {
         return;
       }
       
-      // This would connect to your Stripe checkout functionality
-      // For demonstration, we'll simulate a successful subscription update
+      // Calculate number of seats based on plan
+      const teacherSeats = 1; // Default to 1 teacher seat
+      const studentSeats = planId === 'basic' ? 500 : planId === 'pro' ? 1500 : 5000;
       
-      const seats = planId === 'basic' ? 500 : planId === 'pro' ? 1500 : 5000;
+      // Call the create-checkout-session endpoint
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: {
+          schoolId,
+          teacherSeats,
+          studentSeats
+        }
+      });
       
-      // Update subscription status in Supabase
-      const { error } = await supabase
-        .from('subscriptions')
-        .update({ 
-          status: 'active',
-          total_student_seats: seats,
-          updated_at: new Date().toISOString()
-        })
-        .eq('school_id', schoolId);
-        
       if (error) {
         throw new Error(error.message);
       }
       
-      toast({
-        title: 'Subscription activated',
-        description: 'Your subscription has been successfully activated.',
-      });
-      
-      // Navigate to dashboard
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 2000);
+      // Redirect to the Stripe checkout URL
+      if (data?.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
       
     } catch (error: any) {
       console.error('Subscription error:', error);
@@ -104,7 +98,6 @@ const Subscription: React.FC = () => {
         title: 'Subscription failed',
         description: error.message || 'An error occurred while processing your subscription.',
       });
-    } finally {
       setIsLoading(false);
     }
   };
