@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import {
   Card,
@@ -20,8 +21,13 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Subscription } from "@/types";
 
+// Add UI-specific properties not in the database model
+interface ExtendedSubscription extends Subscription {
+  currentPeriodEnd?: string;
+}
+
 interface SubscriptionManagementProps {
-  subscription: Subscription;
+  subscription: ExtendedSubscription;
   onUpdateSeats: (teacherSeats: number, studentSeats: number) => Promise<void>;
   onOpenCustomerPortal: () => Promise<void>;
 }
@@ -32,10 +38,10 @@ const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({
   onOpenCustomerPortal,
 }) => {
   const [teacherSeats, setTeacherSeats] = useState<number>(
-    subscription.teacherSeats,
+    subscription.total_teacher_seats,
   );
   const [studentSeats, setStudentSeats] = useState<number>(
-    subscription.studentSeats,
+    subscription.total_student_seats,
   );
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
@@ -52,8 +58,8 @@ const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({
 
   const handleUpdateSeats = async () => {
     if (
-      teacherSeats === subscription.teacherSeats &&
-      studentSeats === subscription.studentSeats
+      teacherSeats === subscription.total_teacher_seats &&
+      studentSeats === subscription.total_student_seats
     ) {
       return; // No changes
     }
@@ -67,22 +73,23 @@ const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({
     } catch (err: any) {
       setError(err.message || "Failed to update subscription");
       // Reset to original values on error
-      setTeacherSeats(subscription.teacherSeats);
-      setStudentSeats(subscription.studentSeats);
+      setTeacherSeats(subscription.total_teacher_seats);
+      setStudentSeats(subscription.total_student_seats);
     } finally {
       setIsUpdating(false);
     }
   };
 
   // Calculate price changes
-  const teacherSeatDiff = teacherSeats - subscription.teacherSeats;
-  const studentSeatDiff = studentSeats - subscription.studentSeats;
+  const teacherSeatDiff = teacherSeats - subscription.total_teacher_seats;
+  const studentSeatDiff = studentSeats - subscription.total_student_seats;
   const pricePerSeat = 2; // $2 AUD per seat
   const additionalMonthlyCost =
     (teacherSeatDiff + studentSeatDiff) * pricePerSeat;
 
   // Format date
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "N/A";
     return new Date(dateString).toLocaleDateString("en-AU", {
       year: "numeric",
       month: "long",
@@ -165,8 +172,8 @@ const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({
               </div>
               <div className="text-sm text-muted-foreground">
                 <p>
-                  Used: {subscription.teacherSeatsUsed} /{" "}
-                  {subscription.teacherSeats}
+                  Used: {subscription.used_teacher_seats} /{" "}
+                  {subscription.total_teacher_seats}
                 </p>
                 <p>$2 AUD per teacher / month</p>
               </div>
@@ -204,8 +211,8 @@ const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({
               </div>
               <div className="text-sm text-muted-foreground">
                 <p>
-                  Used: {subscription.studentSeatsUsed} /{" "}
-                  {subscription.studentSeats}
+                  Used: {subscription.used_student_seats} /{" "}
+                  {subscription.total_student_seats}
                 </p>
                 <p>$2 AUD per student / month</p>
               </div>
@@ -271,8 +278,8 @@ const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({
             onClick={handleUpdateSeats}
             disabled={
               isUpdating ||
-              (teacherSeats === subscription.teacherSeats &&
-                studentSeats === subscription.studentSeats)
+              (teacherSeats === subscription.total_teacher_seats &&
+                studentSeats === subscription.total_student_seats)
             }
             className="w-full"
           >

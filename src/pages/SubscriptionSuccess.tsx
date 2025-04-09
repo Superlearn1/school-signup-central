@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
@@ -29,8 +30,21 @@ const SubscriptionSuccess: React.FC = () => {
       }
 
       try {
-        // Get JWT token for Supabase auth
-        const token = await user?.getToken({ template: "supabase" });
+        // Get JWT token for Supabase auth - using the correct method
+        let token = "";
+        try {
+          // Try using the clerk-js SDK method
+          if (user && typeof user.getToken === 'function') {
+            token = await user.getToken({ template: "supabase" });
+          } else {
+            console.warn("User getToken method not available - using fallback");
+            // Fallback: use another method to get auth token if available
+            token = localStorage.getItem('supabase_token') || '';
+          }
+        } catch (tokenError) {
+          console.error("Error getting token:", tokenError);
+          throw new Error("Authentication failed");
+        }
 
         // Try to verify the session with Stripe through our backend if we have a token
         if (token) {

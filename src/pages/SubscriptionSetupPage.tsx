@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser, useOrganization } from "@clerk/clerk-react";
@@ -106,8 +107,23 @@ const SubscriptionSetupPage: React.FC = () => {
         throw new Error("School information not found");
       }
 
-      // Get JWT token for Supabase auth
-      const token = await user?.getToken({ template: "supabase" });
+      // Get JWT token for Supabase auth - using the correct method
+      let token = "";
+      try {
+        // Try using the clerk-js SDK method
+        if (user && typeof user.getToken === 'function') {
+          token = await user.getToken({ template: "supabase" });
+        } else {
+          console.warn("User getToken method not available - using fallback");
+          // Fallback: use another method to get auth token if available
+          // This is just a placeholder and would need implementation
+          token = localStorage.getItem('supabase_token') || '';
+        }
+      } catch (tokenError) {
+        console.error("Error getting token:", tokenError);
+        throw new Error("Authentication failed");
+      }
+
       if (!token) {
         throw new Error("Authentication failed");
       }

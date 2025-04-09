@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import {
   Card,
@@ -36,13 +37,19 @@ interface NCCDEvidenceManagementProps {
   onMarkAsEvidence: (adaptationId: string, dateTaught: Date) => Promise<void>;
 }
 
+// Extended interface to include UI properties not in the database model
+interface ExtendedResourceAdaptation extends ResourceAdaptation {
+  adaptationSummary?: string;
+  markedAsEvidence?: boolean;
+}
+
 const NCCDEvidenceManagement: React.FC<NCCDEvidenceManagementProps> = ({
   adaptations,
   students,
   onMarkAsEvidence,
 }) => {
   const [selectedAdaptation, setSelectedAdaptation] =
-    useState<ResourceAdaptation | null>(null);
+    useState<ExtendedResourceAdaptation | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState<boolean>(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
     new Date(),
@@ -73,7 +80,7 @@ const NCCDEvidenceManagement: React.FC<NCCDEvidenceManagementProps> = ({
 
   const getStudentName = (studentId: string): string => {
     const student = students.find((s) => s.id === studentId);
-    return student ? student.fullName : "Unknown Student";
+    return student ? student.full_name : "Unknown Student";
   };
 
   return (
@@ -99,54 +106,57 @@ const NCCDEvidenceManagement: React.FC<NCCDEvidenceManagementProps> = ({
             </div>
           ) : (
             <div className="space-y-4">
-              {adaptations.map((adaptation) => (
-                <div
-                  key={adaptation.id}
-                  className="border rounded-lg p-4 hover:border-primary/50 transition-colors"
-                >
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="font-medium">
-                        Adaptation for {getStudentName(adaptation.studentId)}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        Created on{" "}
-                        {new Date(adaptation.createdAt).toLocaleDateString()}
+              {adaptations.map((adaptation) => {
+                const extendedAdaptation = adaptation as ExtendedResourceAdaptation;
+                return (
+                  <div
+                    key={adaptation.id}
+                    className="border rounded-lg p-4 hover:border-primary/50 transition-colors"
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h3 className="font-medium">
+                          Adaptation for {getStudentName(adaptation.student_id)}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          Created on{" "}
+                          {new Date(adaptation.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      {extendedAdaptation.markedAsEvidence ? (
+                        <div className="flex items-center text-green-600 text-sm gap-1">
+                          <CheckCircle className="h-4 w-4" />
+                          <span>Marked as Evidence</span>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setSelectedAdaptation(extendedAdaptation);
+                            setIsDialogOpen(true);
+                          }}
+                        >
+                          Mark as Evidence
+                        </Button>
+                      )}
+                    </div>
+                    <div className="bg-muted/50 p-3 rounded-md text-sm">
+                      <p className="font-medium mb-1">Adaptation Summary:</p>
+                      <p className="text-muted-foreground">
+                        {extendedAdaptation.adaptationSummary || extendedAdaptation.adaptations_made?.substring(0, 150) || "No summary available"}...
                       </p>
                     </div>
-                    {adaptation.markedAsEvidence ? (
-                      <div className="flex items-center text-green-600 text-sm gap-1">
-                        <CheckCircle className="h-4 w-4" />
-                        <span>Marked as Evidence</span>
+                    {extendedAdaptation.markedAsEvidence && (
+                      <div className="mt-3 flex justify-end">
+                        <Button variant="outline" size="sm" className="gap-1">
+                          <Download className="h-4 w-4" />
+                          Download PDF
+                        </Button>
                       </div>
-                    ) : (
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          setSelectedAdaptation(adaptation);
-                          setIsDialogOpen(true);
-                        }}
-                      >
-                        Mark as Evidence
-                      </Button>
                     )}
                   </div>
-                  <div className="bg-muted/50 p-3 rounded-md text-sm">
-                    <p className="font-medium mb-1">Adaptation Summary:</p>
-                    <p className="text-muted-foreground">
-                      {adaptation.adaptationSummary.substring(0, 150)}...
-                    </p>
-                  </div>
-                  {adaptation.markedAsEvidence && (
-                    <div className="mt-3 flex justify-end">
-                      <Button variant="outline" size="sm" className="gap-1">
-                        <Download className="h-4 w-4" />
-                        Download PDF
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

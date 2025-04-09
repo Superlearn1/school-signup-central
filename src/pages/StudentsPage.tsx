@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,6 +79,7 @@ const StudentsPage: React.FC = () => {
               setShowAddForm(false);
               // In a real app, this would add the student to the database
             }}
+            onCancel={() => setShowAddForm(false)}
           />
         </div>
       ) : (

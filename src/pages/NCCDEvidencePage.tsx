@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,62 +11,84 @@ import {
 } from "@/components/ui/select";
 import { Search, Download, Filter } from "lucide-react";
 import NCCDEvidenceManagement from "@/components/NCCDEvidenceManagement";
+import { ResourceAdaptation, Student } from "@/types";
+
+// Extended interfaces for the mock data to include UI properties
+interface ExtendedResourceAdaptation extends ResourceAdaptation {
+  adaptationSummary: string;
+  markedAsEvidence: boolean;
+}
 
 const NCCDEvidencePage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [studentFilter, setStudentFilter] = useState<string>("");
 
-  // Mock student data
-  const students = [
+  // Mock student data aligned with the Student interface
+  const students: Student[] = [
     {
       id: "student-1",
-      schoolId: "school-1",
-      studentId: "S12345",
-      fullName: "John Smith",
+      school_id: "school-1",
+      student_id: "S12345",
+      full_name: "John Smith",
       disabilities: ["specific_learning_disorder"],
-      createdAt: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      // For UI purposes
+      first_name: "John",
+      last_name: "Smith"
     },
     {
       id: "student-2",
-      schoolId: "school-1",
-      studentId: "S67890",
-      fullName: "Emma Johnson",
+      school_id: "school-1",
+      student_id: "S67890",
+      full_name: "Emma Johnson",
       disabilities: ["attention_deficit_hyperactivity_disorder"],
-      createdAt: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      // For UI purposes
+      first_name: "Emma",
+      last_name: "Johnson"
     },
   ];
 
-  // Mock adaptation data
-  const adaptations = [
+  // Mock adaptation data aligned with the ResourceAdaptation interface
+  const adaptations: ExtendedResourceAdaptation[] = [
     {
       id: "1",
-      resourceId: "resource-1",
-      studentId: "student-1",
-      adaptedContent: "This is the adapted content for student 1",
-      adaptationSummary:
-        "Modified vocabulary and added visual supports for a student with specific learning disorder",
-      createdAt: new Date().toISOString(),
+      resource_id: "resource-1",
+      student_id: "student-1",
+      adapted_content: "This is the adapted content for student 1",
+      adaptations_made: "Modified vocabulary and added visual supports",
+      created_at: new Date().toISOString(),
+      // UI-specific properties
+      adaptationSummary: "Modified vocabulary and added visual supports for a student with specific learning disorder",
       markedAsEvidence: false,
+      school_id: "school-1",
+      created_by: "teacher-1",
     },
     {
       id: "2",
-      resourceId: "resource-2",
-      studentId: "student-2",
-      adaptedContent: "This is the adapted content for student 2",
-      adaptationSummary:
-        "Simplified instructions and added step-by-step guide for a student with attention-deficit/hyperactivity disorder",
-      createdAt: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+      resource_id: "resource-2",
+      student_id: "student-2",
+      adapted_content: "This is the adapted content for student 2",
+      adaptations_made: "Simplified instructions and added step-by-step guide",
+      created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+      // UI-specific properties
+      adaptationSummary: "Simplified instructions and added step-by-step guide for a student with attention-deficit/hyperactivity disorder",
       markedAsEvidence: true,
+      school_id: "school-1",
+      created_by: "teacher-1",
     },
     {
       id: "3",
-      resourceId: "resource-3",
-      studentId: "student-1",
-      adaptedContent: "Another adaptation for student 1",
-      adaptationSummary:
-        "Chunked content into smaller sections and provided additional practice examples",
-      createdAt: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
+      resource_id: "resource-3",
+      student_id: "student-1",
+      adapted_content: "Another adaptation for student 1",
+      adaptations_made: "Chunked content into smaller sections",
+      created_at: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
+      // UI-specific properties
+      adaptationSummary: "Chunked content into smaller sections and provided additional practice examples",
       markedAsEvidence: true,
+      school_id: "school-1",
+      created_by: "teacher-1",
     },
   ];
 
@@ -75,7 +98,7 @@ const NCCDEvidencePage: React.FC = () => {
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
     const matchesStudent = studentFilter
-      ? adaptation.studentId === studentFilter
+      ? adaptation.student_id === studentFilter
       : true;
     return matchesSearch && matchesStudent;
   });
@@ -121,7 +144,7 @@ const NCCDEvidencePage: React.FC = () => {
               <SelectItem value="">All Students</SelectItem>
               {students.map((student) => (
                 <SelectItem key={student.id} value={student.id}>
-                  {student.fullName}
+                  {student.full_name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -130,7 +153,7 @@ const NCCDEvidencePage: React.FC = () => {
       </div>
 
       <NCCDEvidenceManagement
-        adaptations={filteredAdaptations}
+        adaptations={adaptations}
         students={students}
         onMarkAsEvidence={handleMarkAsEvidence}
       />
