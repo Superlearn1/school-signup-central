@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, ErrorInfo } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -18,6 +17,26 @@ if (import.meta.env.VITE_TEMPO === "true") {
 }
 
 const queryClient = new QueryClient();
+
+// Create a component to show when app is in demo mode
+const ClerkDemoModeNotice = () => {
+  const { toast } = useToast();
+
+  React.useEffect(() => {
+    toast({
+      title: "Demo Mode Active",
+      description:
+        "Clerk API key is missing. Authentication features are limited. Set VITE_CLERK_PUBLISHABLE_KEY to enable full functionality.",
+      duration: 10000,
+    });
+  }, [toast]);
+
+  return (
+    <div className="fixed top-0 left-0 right-0 bg-yellow-100 text-yellow-800 p-2 text-center text-sm z-50">
+      ⚠️ Demo Mode: Authentication features are limited. Set Clerk API key for full functionality.
+    </div>
+  );
+};
 
 // Create a fallback component to show when Clerk key is missing
 const ClerkKeyMissing = () => {
@@ -103,28 +122,24 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-const App = () => {
-  const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+interface AppProps {
+  isDemoMode?: boolean;
+}
 
-  // If no Clerk key is available, show the error page
-  if (!clerkPubKey) {
-    return <ClerkKeyMissing />;
-  }
-
+const App = ({ isDemoMode = false }: AppProps) => {
   return (
     <ErrorBoundary>
-      <ClerkProvider publishableKey={clerkPubKey}>
-        <QueryClientProvider client={queryClient}>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <AppRoutes />
-              <ClerkDebugger />
-            </BrowserRouter>
-          </TooltipProvider>
-        </QueryClientProvider>
-      </ClerkProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          {isDemoMode && <ClerkDemoModeNotice />}
+          <BrowserRouter>
+            <AppRoutes />
+            <ClerkDebugger />
+          </BrowserRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
     </ErrorBoundary>
   );
 };

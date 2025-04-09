@@ -207,8 +207,13 @@ const SettingsPage: React.FC = () => {
                   </CardDescription>
                 </div>
                 <TeacherInviteModal
-                  availableSeats={2}
-                  onInvite={handleInviteTeacher}
+                  availableSeats={5}
+                  onInvite={async (email) => {
+                    console.log("Inviting teacher:", email);
+                    // In a real app, this would call an API to invite the teacher
+                    await new Promise((resolve) => setTimeout(resolve, 1500));
+                  }}
+                  maxSeats={10}
                 />
               </div>
             </CardHeader>

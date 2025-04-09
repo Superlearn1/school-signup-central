@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
@@ -34,12 +33,16 @@ const SubscriptionSuccess: React.FC = () => {
         let token = "";
         try {
           // Try using the clerk-js SDK method
-          if (user && typeof user.getToken === 'function') {
-            token = await user.getToken({ template: "supabase" });
-          } else {
-            console.warn("User getToken method not available - using fallback");
-            // Fallback: use another method to get auth token if available
-            token = localStorage.getItem('supabase_token') || '';
+          if (user) {
+            // Cast to any to bypass TypeScript checking for the getToken method
+            const userWithToken = user as any;
+            if (typeof userWithToken.getToken === 'function') {
+              token = await userWithToken.getToken({ template: "supabase" });
+            } else {
+              console.warn("User getToken method not available - using fallback");
+              // Fallback: use another method to get auth token if available
+              token = localStorage.getItem('supabase_token') || '';
+            }
           }
         } catch (tokenError) {
           console.error("Error getting token:", tokenError);

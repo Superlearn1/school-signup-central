@@ -13,7 +13,6 @@ dist-ssr
 *.local
 
 # Environment variables
-.env*
 
 # Editor directories and files
 .vscode/
@@ -29,3 +28,7 @@ dist-ssr
 # Tempo files
 **/tempobook/dynamic/
 **/tempobook/storyboards/
+config.bat
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
