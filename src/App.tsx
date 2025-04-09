@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, ErrorInfo } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -9,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import ClerkDebugger from "@/utils/clerk-debug";
 import AppRoutes from "@/components/AppRoutes";
 import { TempoDevtools } from "tempo-devtools";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 // Initialize Tempo Devtools
 if (import.meta.env.VITE_TEMPO === "true") {
@@ -71,8 +73,6 @@ class ErrorBoundary extends React.Component<
 
     // Report to Tempo if in Tempo environment
     if (import.meta.env.VITE_TEMPO === "true") {
-      // Tempo will automatically capture errors from the error-handling.js script
-      // This is just an additional reporting mechanism
       console.error("Error reported to Tempo:", error.message);
     }
   }
